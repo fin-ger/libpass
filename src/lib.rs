@@ -62,7 +62,7 @@ mod tests {
         let content = store.content(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
         let dir = content.directories().next().context("no directories")?;
         let pass = dir.passwords().next().context("no passwords")?;
-        println!("{}", pass.decrypt()?.content());
+        println!("{}: {}", pass.path().display(), pass.decrypt()?.content());
 
         Ok(())
     }
