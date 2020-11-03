@@ -1,0 +1,12 @@
+[package]
+name = "pass"
+version = "0.1.0"
+authors = ["Fin Christensen <christensen.fin@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.33"
+bitflags = "1.2.1"
+directories = "3.0.1"
+gpgme = "0.9.2"
+id_tree = "1.7.0"
