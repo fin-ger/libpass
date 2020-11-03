@@ -1,0 +1,6 @@
+[test_config]
+debug = true
+verbose = false
+
+[report]
+out = ["Html"]
