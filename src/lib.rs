@@ -13,7 +13,7 @@ pub use iterators::*;
 #[cfg(test)]
 mod tests {
     use gpgme::{Context, KeyListMode, Protocol};
-    use anyhow::Result;
+    use anyhow::{Result, Context as AnyhowContext};
     use crate::{Store, Location, Sorting, Directory};
 
     fn print_dir(dir: &Directory<'_>) {
@@ -53,6 +53,17 @@ mod tests {
         let store = Store::open(Location::Automatic)?;
         let content = store.content(Sorting::NONE);
         print_dir(&content);
+        Ok(())
+    }
+
+    #[test]
+    fn decrypt() -> Result<()> {
+        let store = Store::open(Location::Automatic)?;
+        let content = store.content(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        let dir = content.directories().next().context("no directories")?;
+        let pass = dir.passwords().next().context("no passwords")?;
+        println!("{}", pass.decrypt()?.content());
+
         Ok(())
     }
 

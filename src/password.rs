@@ -1,12 +1,27 @@
+use anyhow::Result;
+use gpgme::{Context, Protocol};
+
 use std::path::Path;
+use std::fs::File;
 
 pub struct DecryptedPassword {
+    content: String,
 }
 
 impl DecryptedPassword {
-    fn new(_path: &Path) -> Self {
-        Self {
-        }
+    fn new(path: &Path) -> Result<Self> {
+        let mut pw = File::open(path)?;
+        let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+        let mut content = Vec::new();
+        // TODO: Add password provider
+        ctx.decrypt(&mut pw, &mut content)?;
+        Ok(Self {
+            content: String::from_utf8_lossy(&content).to_string(),
+        })
+    }
+
+    pub fn content<'a>(&'a self) -> &'a str {
+        &self.content
     }
 }
 
@@ -31,7 +46,7 @@ impl<'a> Password<'a> {
         self.path
     }
 
-    pub fn decrypt(&self) -> DecryptedPassword {
+    pub fn decrypt(&self) -> Result<DecryptedPassword> {
         DecryptedPassword::new(self.path)
     }
 }
