@@ -1,0 +1,13 @@
+anything = _{ (!NEWLINE ~ ANY) }
+word = _{ ASCII_ALPHANUMERIC }
+space = _{ " " | "\t" }
+password = { anything+ }
+comment = { anything+ }
+key = { word+ }
+value = { anything* }
+entry = { key ~ space* ~ (":" | "=") ~ space* ~ value }
+content = {
+    password ~ NEWLINE* ~
+    ((entry | comment) ~ NEWLINE+)* ~
+    (entry | comment)?
+}

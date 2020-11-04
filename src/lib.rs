@@ -12,8 +12,7 @@ pub use iterators::*;
 
 #[cfg(test)]
 mod tests {
-    use gpgme::{Context, KeyListMode, Protocol};
-    use anyhow::{Result, Context as AnyhowContext};
+    use anyhow::{Result, Context};
     use crate::{Store, Location, Sorting, Directory};
 
     fn print_dir(dir: &Directory<'_>) {
@@ -62,43 +61,20 @@ mod tests {
         let content = store.content(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
         let dir = content.directories().next().context("no directories")?;
         let pass = dir.passwords().next().context("no passwords")?;
-        println!("{}: {}", pass.path().display(), pass.decrypt()?.content());
+        let decrypt = pass.decrypt()?;
+        println!("{}:", pass.path().display());
+        println!("  password: {}", decrypt.password());
+        println!("  comments: {:#?}", decrypt.comments());
+        println!("  entries: {:#?}", decrypt.all_entries());
 
         Ok(())
     }
 
     #[test]
-    fn run() -> Result<()> {
-        let mode = KeyListMode::empty();
-        let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
-        ctx.set_key_list_mode(mode)?;
-        let mut keys = ctx.secret_keys()?;
-        for key in keys.by_ref().filter_map(|x| x.ok()) {
-            println!("keyid   : {}", key.id().unwrap_or("?"));
-            println!("fpr     : {}", key.fingerprint().unwrap_or("?"));
-            println!(
-                "caps    : {}{}{}{}",
-                if key.can_encrypt() { "e" } else { "" },
-                if key.can_sign() { "s" } else { "" },
-                if key.can_certify() { "c" } else { "" },
-                if key.can_authenticate() { "a" } else { "" }
-            );
-            println!(
-                "flags   :{}{}{}{}{}{}",
-                if key.has_secret() { " secret" } else { "" },
-                if key.is_revoked() { " revoked" } else { "" },
-                if key.is_expired() { " expired" } else { "" },
-                if key.is_disabled() { " disabled" } else { "" },
-                if key.is_invalid() { " invalid" } else { "" },
-                if key.is_qualified() { " qualified" } else { "" }
-            );
-            for (i, user) in key.user_ids().enumerate() {
-                println!("userid {}: {}", i, user.id().unwrap_or("[none]"));
-                println!("valid  {}: {:?}", i, user.validity())
-            }
-            println!("");
-        }
-
-        Ok(())
+    fn sorting() {
+        assert!(Sorting::NONE.bits() == 0, "Sorting::NONE is not 0");
+        assert!(Sorting::ALPHABETICAL.bits() == 1, "Sorting::ALPHABETICAL is not 1");
+        assert!(Sorting::DIRECTORIES_FIRST.bits() == 2, "Sorting::DIRECTORIES_FIRST is not 2");
+        assert!((Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST).bits() == 3, "Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST is not 3");
     }
 }
