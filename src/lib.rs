@@ -13,7 +13,7 @@ pub use iterators::*;
 #[cfg(test)]
 mod tests {
     use anyhow::{Result, Context};
-    use crate::{Store, Location, Sorting, Directory};
+    use crate::{Store, Location, Sorting, Directory, TraversalOrder};
 
     fn print_dir(dir: &Directory<'_>) {
         println!("Passwords:");
@@ -41,24 +41,29 @@ mod tests {
 
     #[test]
     fn smoke() -> Result<()> {
-        let store = Store::open(Location::Automatic)?;
-        let content = store.content(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        let store = Store::open(Location::Automatic)?
+            .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        let content = store.content();
+        println!(">>> smoke <<<");
         print_dir(&content);
         Ok(())
     }
 
     #[test]
     fn no_sorting() -> Result<()> {
-        let store = Store::open(Location::Automatic)?;
-        let content = store.content(Sorting::NONE);
+        let store = Store::open(Location::Automatic)?
+            .with_sorting(Sorting::NONE);
+        let content = store.content();
+        println!(">>> no sorting <<<");
         print_dir(&content);
         Ok(())
     }
 
     #[test]
     fn decrypt() -> Result<()> {
-        let store = Store::open(Location::Automatic)?;
-        let content = store.content(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        let store = Store::open(Location::Automatic)?
+            .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        let content = store.content();
         let dir = content.directories().next().context("no directories")?;
         let pass = dir.passwords().next().context("no passwords")?;
         let decrypt = pass.decrypt()?;
@@ -66,6 +71,20 @@ mod tests {
         println!("  password: {}", decrypt.password());
         println!("  comments: {:#?}", decrypt.comments());
         println!("  entries: {:#?}", decrypt.all_entries());
+
+        Ok(())
+    }
+
+    #[test]
+    fn traversal() -> Result<()> {
+        let store = Store::open(Location::Automatic)?
+            .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+
+        println!(">>> traversal <<<");
+        for entry in store.traverse_recursive(TraversalOrder::PostOrder) {
+            let kind = if entry.is_password() { "PW" } else { "DIR" };
+            println!("  {} {}: {}", kind, entry.path().display(), entry.name());
+        }
 
         Ok(())
     }

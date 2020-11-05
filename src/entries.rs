@@ -1,53 +1,51 @@
-use id_tree::{Tree, NodeId};
+use id_tree::{Tree, NodeId, ChildrenIds};
 
-use std::slice;
 use std::path::Path;
 
-use crate::{Password, Directory, Sorting, PassNode};
+use crate::{Password, Directory, PassNode};
 
-pub enum DirectoryEntry<'a> {
-    Password(Password<'a>),
-    Directory(Directory<'a>),
+pub struct DirectoryEntry<'a> {
+    data: &'a PassNode,
+    tree: &'a Tree<PassNode>,
+    node_id: NodeId,
 }
 
 impl<'a> DirectoryEntry<'a> {
-    pub fn name(&self) -> &'a str {
-        match self {
-            DirectoryEntry::Password(pw) => pw.name(),
-            DirectoryEntry::Directory(dir) => dir.name(),
+    pub(crate) fn new(node_id: NodeId, tree: &'a Tree<PassNode>) -> Self {
+        Self {
+            data: tree.get(&node_id).unwrap().data(),
+            tree,
+            node_id,
         }
+    }
+
+    pub fn name(&self) -> &'a str {
+        self.data.name()
     }
 
     pub fn path(&self) -> &'a Path {
-        match self {
-            DirectoryEntry::Password(pw) => pw.path(),
-            DirectoryEntry::Directory(dir) => dir.path(),
-        }
+        self.data.path()
     }
 
     pub fn is_dir(&self) -> bool {
-        if let DirectoryEntry::Directory(..) = self {
-            true
-        } else {
-            false
-        }
+        self.data.is_dir()
     }
 
     pub fn is_password(&self) -> bool {
-        !self.is_dir()
+        self.data.is_password()
     }
 
     pub fn password(self) -> Option<Password<'a>> {
-        if let DirectoryEntry::Password(pw) = self {
-            Some(pw)
+        if let PassNode::Password { name, path } = self.data {
+            Some(Password::new(name, path))
         } else {
             None
         }
     }
 
     pub fn directory(self) -> Option<Directory<'a>> {
-        if let DirectoryEntry::Directory(dir) = self {
-            Some(dir)
+        if let PassNode::Directory { name, path } = self.data {
+            Some(Directory::new(name, path, self.tree, &self.node_id))
         } else {
             None
         }
@@ -56,19 +54,16 @@ impl<'a> DirectoryEntry<'a> {
 
 pub struct Entries<'a> {
     tree: &'a Tree<PassNode>,
-    sorting: Sorting,
-    iter: slice::Iter<'a, &'a NodeId>,
+    iter: ChildrenIds<'a>,
 }
 
 impl<'a> Entries<'a> {
     pub(crate) fn new(
         tree: &'a Tree<PassNode>,
-        sorting: Sorting,
-        iter: slice::Iter<'a, &'a NodeId>,
+        iter: ChildrenIds<'a>,
     ) -> Self {
         Self {
             tree,
-            sorting,
             iter,
         }
     }
@@ -78,16 +73,9 @@ impl<'a> Iterator for Entries<'a> {
     type Item = DirectoryEntry<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let id = self.iter.next()?;
-        let node = self.tree.get(id).expect("Failed to find node id in internal tree");
-
-        Some(match node.data() {
-            PassNode::Password { name, path } => {
-                DirectoryEntry::Password(Password::new(name, path))
-            },
-            PassNode::Directory { name, path } => {
-                DirectoryEntry::Directory(Directory::new(name, path, self.tree, id, self.sorting.clone()))
-            },
-        })
+        self.iter.next()
+            .map(|id| {
+                DirectoryEntry::new(id.clone(), self.tree)
+            })
     }
 }

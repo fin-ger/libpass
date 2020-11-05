@@ -1,9 +1,10 @@
-use id_tree::{Tree, Node, NodeId, InsertBehavior};
+use id_tree::{Tree, Node, NodeId, InsertBehavior, LevelOrderTraversalIds, PostOrderTraversalIds, PreOrderTraversalIds};
 use anyhow::{anyhow, Context, Result, Error};
 use directories::BaseDirs;
 use bitflags::bitflags;
 
 use std::{env, fs};
+use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 
 use crate::Directory;
@@ -15,6 +16,7 @@ pub enum Location {
     Manual(PathBuf),
 }
 
+#[derive(Clone)]
 pub(crate) enum PassNode {
     Directory {
         name: String,
@@ -35,10 +37,21 @@ impl PassNode {
         }
     }
 
+    pub(crate) fn is_password(&self) -> bool {
+        !self.is_dir()
+    }
+
     pub(crate) fn name(&self) -> &str {
         match self {
             Self::Directory { ref name, .. } => name,
             Self::Password { ref name, .. } => name,
+        }
+    }
+
+    pub(crate) fn path(&self) -> &Path {
+        match self {
+            Self::Directory { ref path, .. } => path,
+            Self::Password { ref path, .. } => path,
         }
     }
 }
@@ -50,6 +63,27 @@ bitflags! {
         const DIRECTORIES_FIRST = 2;
     }
 }
+
+impl Sorting {
+    pub(crate) fn cmp(&self, a: &Node<PassNode>, b: &Node<PassNode>) -> Ordering {
+        let sort_dirs = self.contains(Sorting::DIRECTORIES_FIRST);
+        let sort_alpha = self.contains(Sorting::ALPHABETICAL);
+
+        if sort_dirs && a.data().is_dir() && !b.data().is_dir() {
+            Ordering::Less
+        } else if sort_dirs && !a.data().is_dir() && b.data().is_dir() {
+            Ordering::Greater
+        } else if sort_alpha {
+            let a_low = a.data().name().to_lowercase();
+            let b_low = b.data().name().to_lowercase();
+
+            a_low.cmp(&b_low)
+        } else {
+            Ordering::Less
+        }
+    }
+}
+
 
 pub struct Store {
     path: PathBuf,
@@ -83,6 +117,24 @@ impl Store {
         let _errors = me.load_passwords()?; // TODO: propagate errors
 
         Ok(me)
+    }
+
+    pub fn with_sorting(mut self, sorting: Sorting) -> Self {
+        self.sort(sorting);
+        self
+    }
+
+    pub fn sort(&mut self, sorting: Sorting) {
+        let root_id = self.tree.root_node_id()
+            .expect("Cannot find root node in internal tree").clone();
+        let level_order = self.tree.traverse_level_order_ids(&root_id)
+            .expect("Failed to traverse internal tree")
+            .collect::<Vec<_>>();
+
+        for node_id in level_order {
+            self.tree.sort_children_by(&node_id, |a, b| sorting.cmp(a, b))
+                .expect("Failed to sort internal tree");
+        }
     }
 
     fn load_passwords(&mut self) -> Result<Vec<Error>> {
@@ -156,9 +208,74 @@ impl Store {
         Ok(errors)
     }
 
-    pub fn content(&self, sorting: Sorting) -> Directory {
+    pub fn content(&self) -> Directory {
         let root_id = self.tree.root_node_id()
             .expect("Failed to get root node of internal tree");
-        Directory::new(".", &self.path, &self.tree, root_id, sorting)
+        Directory::new(".", &self.path, &self.tree, root_id)
+    }
+
+    pub fn traverse_recursive(&self, order: TraversalOrder) -> RecursiveTraversal {
+        RecursiveTraversal::new(&self.tree, order)
+    }
+}
+
+pub enum TraversalOrder {
+    LevelOrder,
+    PostOrder,
+    PreOrder,
+}
+
+enum InnerRecursiveTraversal<'a> {
+    LevelOrder(LevelOrderTraversalIds<'a, PassNode>),
+    PostOrder(PostOrderTraversalIds),
+    PreOrder(PreOrderTraversalIds<'a, PassNode>),
+}
+
+use crate::DirectoryEntry;
+
+pub struct RecursiveTraversal<'a> {
+    iter: InnerRecursiveTraversal<'a>,
+    tree: &'a Tree<PassNode>,
+}
+
+impl<'a> RecursiveTraversal<'a> {
+    fn new(tree: &'a Tree<PassNode>, order: TraversalOrder) -> Self {
+        let root_id = tree.root_node_id()
+            .expect("Failed to retrieve root node of internal tree")
+            .clone();
+
+        let iter = match order {
+            TraversalOrder::LevelOrder => InnerRecursiveTraversal::LevelOrder(
+                tree.traverse_level_order_ids(&root_id)
+                    .expect("Failed to traverse level order on the internal tree")
+            ),
+            TraversalOrder::PostOrder => InnerRecursiveTraversal::PostOrder(
+                tree.traverse_post_order_ids(&root_id)
+                    .expect("Failed to traverse post order on the internal tree")
+            ),
+            TraversalOrder::PreOrder => InnerRecursiveTraversal::PreOrder(
+                tree.traverse_pre_order_ids(&root_id)
+                    .expect("Failed to traverse pre order on the internal tree")
+            ),
+        };
+
+        Self {
+            iter,
+            tree,
+        }
+    }
+}
+
+impl<'a> Iterator for RecursiveTraversal<'a> {
+    type Item = DirectoryEntry<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let node_id = match self.iter {
+            InnerRecursiveTraversal::LevelOrder(ref mut t) => t.next(),
+            InnerRecursiveTraversal::PostOrder(ref mut t) => t.next(),
+            InnerRecursiveTraversal::PreOrder(ref mut t) => t.next(),
+        }?;
+
+        Some(DirectoryEntry::new(node_id, self.tree))
     }
 }
