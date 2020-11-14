@@ -16,9 +16,14 @@ impl<'a> Iterator for Passwords<'a> {
     type Item = Password<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.entries
-            .next()?
-            .password()
+        let mut pw = None;
+        while pw.is_none() {
+            pw = self.entries
+                .next()?
+                .password()
+        }
+
+        pw
     }
 }
 
@@ -38,8 +43,13 @@ impl<'a> Iterator for Directories<'a> {
     type Item = Directory<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.entries
-            .next()?
-            .directory()
+        let mut dir = None;
+        while dir.is_none() {
+            dir = self.entries
+                .next()?
+                .directory()
+        }
+
+        dir
     }
 }

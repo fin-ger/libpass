@@ -1,13 +1,14 @@
-use id_tree::{Tree, Node, NodeId, InsertBehavior, LevelOrderTraversalIds, PostOrderTraversalIds, PreOrderTraversalIds};
-use anyhow::{anyhow, Context, Result, Error};
-use directories::BaseDirs;
-use bitflags::bitflags;
-
 use std::{env, fs};
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
+use std::iter::Skip;
 
-use crate::Directory;
+use thiserror::Error;
+use id_tree::{Tree, Node, NodeId, InsertBehavior, LevelOrderTraversalIds, PostOrderTraversalIds, PreOrderTraversalIds};
+use directories::BaseDirs;
+use bitflags::bitflags;
+
+use crate::{Directory, StoreReadError, IntoStoreReadError};
 
 pub enum Location {
     /// $PASSWORD_STORE_DIR or if not set ~/.password-store
@@ -84,18 +85,18 @@ impl Sorting {
     }
 }
 
-
 pub struct Store {
     path: PathBuf,
     tree: Tree<PassNode>,
+    errors: Vec<StoreReadError>,
 }
 
 impl Store {
-    pub fn open(location: Location) -> Result<Self> {
+    pub fn open(location: Location) -> Result<Self, StoreError> {
         let path = match location {
             Location::Automatic => {
                 env::var("PASSWORD_STORE_DIR")
-                    .context("PASSWORD_STORE_DIR environment variable is not set")
+                    .with_store_error()
                     .map(|password_store_dir| {
                         Path::new(&password_store_dir).to_owned()
                     })
@@ -103,7 +104,7 @@ impl Store {
                         BaseDirs::new()
                             .map(|base_dirs| base_dirs.home_dir().join(".password-store"))
                             .ok_or(e)
-                            .context("Cannot find home directory for current user")
+                            .with_store_error()
                     })?
             },
             Location::Manual(path) => path,
@@ -113,8 +114,9 @@ impl Store {
         let mut me = Self {
             path,
             tree,
+            errors: Vec::new(),
         };
-        let _errors = me.load_passwords()?; // TODO: propagate errors
+        me.load_passwords();
 
         Ok(me)
     }
@@ -122,6 +124,14 @@ impl Store {
     pub fn with_sorting(mut self, sorting: Sorting) -> Self {
         self.sort(sorting);
         self
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn errors(&self) -> StoreReadErrors {
+        StoreReadErrors::new(&self.errors)
     }
 
     pub fn sort(&mut self, sorting: Sorting) {
@@ -137,7 +147,7 @@ impl Store {
         }
     }
 
-    fn load_passwords(&mut self) -> Result<Vec<Error>> {
+    fn load_passwords(&mut self) {
         self.tree = Tree::new();
         let root_id = self.tree.insert(
             Node::new(PassNode::Directory {
@@ -147,7 +157,7 @@ impl Store {
             InsertBehavior::AsRoot,
         ).expect("Failed to create internal tree representation");
 
-        self.load_passwords_from_dir(&self.path.clone(), &root_id)
+        self.load_passwords_from_dir(&self.path.clone(), &root_id);
     }
 
     fn is_special_entry(path: &Path) -> bool {
@@ -157,16 +167,17 @@ impl Store {
         }
     }
 
-    fn load_passwords_from_dir(&mut self, dir: &Path, parent: &NodeId) -> Result<Vec<Error>> {
-        let (mut read_dir, mut errors): (Vec<_>, Vec<_>) = fs::read_dir(dir)
-            .context(format!("Cannot open directory: {}", dir.display()))?
-            .partition(Result::is_ok);
-
-        let read_dir = read_dir.drain(..).map(|res| res.unwrap());
-        let mut errors: Vec<_> = errors
-            .drain(..)
-            .map(|res| res.unwrap_err().into())
-            .collect();
+    fn load_passwords_from_dir(&mut self, dir: &Path, parent: &NodeId) {
+        let (read_dir, mut errors) = match fs::read_dir(dir).with_store_read_error(dir) {
+            Ok(read_dir) => {
+                let (mut read_dir_res, mut errors_res): (Vec<_>, Vec<_>) = read_dir.partition(Result::is_ok);
+                (
+                    read_dir_res.drain(..).map(|res| res.unwrap()).collect(),
+                    errors_res.drain(..).map(|res| res.with_store_read_error(dir).unwrap_err()).collect(),
+                )
+            },
+            Err(err) => (vec![], vec![err]),
+        };
 
         for entry in read_dir {
             let path = entry.path();
@@ -181,10 +192,10 @@ impl Store {
                             }),
                             InsertBehavior::UnderNode(parent),
                         ).expect("Failed to insert directory into internal tree");
-                        self.load_passwords_from_dir(&path, &subdir)?;
+                        self.load_passwords_from_dir(&path, &subdir);
                     },
                     None => {
-                        errors.push(anyhow!("Cannot get directory name for '{}'", path.display()));
+                        errors.push(StoreReadError::name_error(&path));
                     },
                 }
             } else if !Self::is_special_entry(&path) {
@@ -199,13 +210,13 @@ impl Store {
                         ).expect("Failed to insert password into internal tree");
                     },
                     None => {
-                        errors.push(anyhow!("Cannot get password name for '{}'", path.display()));
+                        errors.push(StoreReadError::name_error(&path));
                     },
                 }
             }
         }
 
-        Ok(errors)
+        self.errors.extend(errors);
     }
 
     pub fn content(&self) -> Directory {
@@ -226,9 +237,9 @@ pub enum TraversalOrder {
 }
 
 enum InnerRecursiveTraversal<'a> {
-    LevelOrder(LevelOrderTraversalIds<'a, PassNode>),
-    PostOrder(PostOrderTraversalIds),
-    PreOrder(PreOrderTraversalIds<'a, PassNode>),
+    LevelOrder(Skip<LevelOrderTraversalIds<'a, PassNode>>),
+    PostOrder(Skip<PostOrderTraversalIds>),
+    PreOrder(Skip<PreOrderTraversalIds<'a, PassNode>>),
 }
 
 use crate::DirectoryEntry;
@@ -248,14 +259,17 @@ impl<'a> RecursiveTraversal<'a> {
             TraversalOrder::LevelOrder => InnerRecursiveTraversal::LevelOrder(
                 tree.traverse_level_order_ids(&root_id)
                     .expect("Failed to traverse level order on the internal tree")
+                    .skip(1)
             ),
             TraversalOrder::PostOrder => InnerRecursiveTraversal::PostOrder(
                 tree.traverse_post_order_ids(&root_id)
                     .expect("Failed to traverse post order on the internal tree")
+                    .skip(1)
             ),
             TraversalOrder::PreOrder => InnerRecursiveTraversal::PreOrder(
                 tree.traverse_pre_order_ids(&root_id)
                     .expect("Failed to traverse pre order on the internal tree")
+                    .skip(1)
             ),
         };
 
@@ -277,5 +291,53 @@ impl<'a> Iterator for RecursiveTraversal<'a> {
         }?;
 
         Some(DirectoryEntry::new(node_id, self.tree))
+    }
+}
+
+pub struct StoreReadErrors<'a> {
+    iter: std::slice::Iter<'a, StoreReadError>,
+}
+
+impl<'a> StoreReadErrors<'a> {
+    fn new(errors: &'a Vec<StoreReadError>) -> Self {
+        Self {
+            iter: errors.into_iter()
+        }
+    }
+}
+
+impl<'a> Iterator for StoreReadErrors<'a> {
+    type Item = &'a StoreReadError;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum StoreError {
+    #[error("PASSWORD_STORE_DIR environment variable is not set")]
+    EnvVar(#[source] env::VarError),
+    #[error("Cannot find home directory for current user")]
+    NoHome(#[source] Box<StoreError>),
+}
+
+trait IntoStoreError<T> {
+    fn with_store_error(self: Self) -> Result<T, StoreError>;
+}
+
+impl<T> IntoStoreError<T> for Result<T, env::VarError> {
+    fn with_store_error(self: Self) -> Result<T, StoreError> {
+        self.map_err(|err| {
+            StoreError::EnvVar(err)
+        })
+    }
+}
+
+impl<T> IntoStoreError<T> for Result<T, StoreError> {
+    fn with_store_error(self: Self) -> Result<T, StoreError> {
+        self.map_err(|err| {
+            StoreError::NoHome(Box::new(err))
+        })
     }
 }

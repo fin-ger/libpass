@@ -3,6 +3,7 @@ mod directory;
 mod password;
 mod entries;
 mod iterators;
+mod git;
 
 pub use store::*;
 pub use directory::*;
@@ -39,20 +40,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn smoke() -> Result<()> {
-        let store = Store::open(Location::Automatic)?
-            .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
-        let content = store.content();
-        println!(">>> smoke <<<");
-        print_dir(&content);
-        Ok(())
+    fn print_errors(store: &Store) {
+        for err in store.errors() {
+            println!("{:?}", err);
+        }
     }
 
     #[test]
     fn no_sorting() -> Result<()> {
         let store = Store::open(Location::Automatic)?
             .with_sorting(Sorting::NONE);
+        print_errors(&store);
+        assert!(!store.has_errors());
         let content = store.content();
         println!(">>> no sorting <<<");
         print_dir(&content);
@@ -63,6 +62,8 @@ mod tests {
     fn decrypt() -> Result<()> {
         let store = Store::open(Location::Automatic)?
             .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        print_errors(&store);
+        assert!(!store.has_errors());
         let content = store.content();
         let dir = content.directories().next().context("no directories")?;
         let pass = dir.passwords().next().context("no passwords")?;
@@ -79,6 +80,8 @@ mod tests {
     fn traversal() -> Result<()> {
         let store = Store::open(Location::Automatic)?
             .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        print_errors(&store);
+        assert!(!store.has_errors());
 
         println!(">>> traversal <<<");
         for entry in store.traverse_recursive(TraversalOrder::PostOrder) {
