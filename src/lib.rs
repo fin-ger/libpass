@@ -10,6 +10,7 @@ pub use directory::*;
 pub use password::*;
 pub use entries::*;
 pub use iterators::*;
+pub use git::*;
 
 #[cfg(test)]
 mod tests {

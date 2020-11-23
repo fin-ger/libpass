@@ -1,6 +1,7 @@
 use id_tree::{Tree, NodeId, ChildrenIds};
 
 use std::path::Path;
+use std::fmt;
 
 use crate::{Password, Directory, PassNode};
 
@@ -49,6 +50,17 @@ impl<'a> DirectoryEntry<'a> {
         } else {
             None
         }
+    }
+}
+
+impl<'a> fmt::Debug for DirectoryEntry<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = if self.is_dir() { "Directory" } else { "Password" };
+        f.debug_struct("DirectoryEntry")
+            .field("kind", &kind.to_string())
+            .field("name", &self.name().to_string())
+            .field("path", &self.path().display().to_string())
+            .finish()
     }
 }
 

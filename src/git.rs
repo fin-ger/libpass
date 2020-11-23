@@ -6,7 +6,7 @@ use crate::DecryptedPassword;
 pub struct GitStatus;
 
 pub struct GitRepository {
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 #[derive(Error, Debug)]
@@ -24,7 +24,7 @@ impl GitRepository {
 
     // TODO: handle merge conflict
     //       show user both decrypted passwords and let the user choose which to take
-    pub fn pull<H>(&mut self, merge_handler: H) -> GitResult<()>
+    pub fn pull<H>(&mut self, _merge_handler: H) -> GitResult<()>
     where H: Fn(&DecryptedPassword, &DecryptedPassword) -> DecryptedPassword {
         Ok(())
     }
@@ -37,11 +37,11 @@ impl GitRepository {
         Ok(GitStatus)
     }
 
-    pub fn commit(&mut self, message: &str) -> GitResult<()> {
+    pub fn commit(&mut self, _message: &str) -> GitResult<()> {
         Ok(())
     }
 
-    pub fn add(&mut self, paths: &[&Path]) -> GitResult<()> {
+    pub fn add(&mut self, _paths: &[&Path]) -> GitResult<()> {
         Ok(())
     }
 
@@ -49,7 +49,7 @@ impl GitRepository {
         false
     }
 
-    pub fn config_set_user_name(&mut self, name: &str) -> GitResult<()> {
+    pub fn config_set_user_name(&mut self, _name: &str) -> GitResult<()> {
         Ok(())
     }
 
@@ -57,7 +57,7 @@ impl GitRepository {
         Ok(None)
     }
 
-    pub fn config_set_user_email(&mut self, email: &str) -> GitResult<()> {
+    pub fn config_set_user_email(&mut self, _email: &str) -> GitResult<()> {
         Ok(())
     }
 

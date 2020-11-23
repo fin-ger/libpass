@@ -15,4 +15,15 @@ thiserror = "1.0.22"
 
 [dev-dependencies]
 anyhow = "1.0.34"
+async-trait = "0.1.42"
+futures = "0.3.8"
 tempdir = "0.3.7"
+
+[dev-dependencies.cucumber_rust]
+git = "https://github.com/bbqsrc/cucumber-rust"
+branch = "main"
+features = ["macros"]
+
+[[test]]
+name = "cucumber"
+harness = false

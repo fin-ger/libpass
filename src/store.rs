@@ -92,6 +92,10 @@ pub struct Store {
 }
 
 impl Store {
+    pub fn init(_location: Location, _key_id: String) -> Result<Self, StoreError> {
+        unimplemented!();
+    }
+
     pub fn open(location: Location) -> Result<Self, StoreError> {
         let path = match location {
             Location::Automatic => {
@@ -227,6 +231,10 @@ impl Store {
 
     pub fn traverse_recursive(&self, order: TraversalOrder) -> RecursiveTraversal {
         RecursiveTraversal::new(&self.tree, order)
+    }
+
+    pub fn location(&self) -> &Path {
+        &self.path
     }
 }
 
