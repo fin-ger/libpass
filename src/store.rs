@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::{env, fs, io};
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::iter::Skip;
@@ -113,6 +113,11 @@ impl Store {
             },
             Location::Manual(path) => path,
         };
+
+        let metadata = path.metadata().with_store_error()?;
+        if !metadata.is_dir() {
+            return Err(StoreError::NoDirectory(path));
+        }
 
         let tree = Tree::new();
         let mut me = Self {
@@ -324,6 +329,10 @@ impl<'a> Iterator for StoreReadErrors<'a> {
 
 #[derive(Error, Debug)]
 pub enum StoreError {
+    #[error("Could not open password store")]
+    Io(#[source] io::Error),
+    #[error("Password store path is not a directory: {0}")]
+    NoDirectory(PathBuf),
     #[error("PASSWORD_STORE_DIR environment variable is not set")]
     EnvVar(#[source] env::VarError),
     #[error("Cannot find home directory for current user")]
@@ -346,6 +355,14 @@ impl<T> IntoStoreError<T> for Result<T, StoreError> {
     fn with_store_error(self: Self) -> Result<T, StoreError> {
         self.map_err(|err| {
             StoreError::NoHome(Box::new(err))
+        })
+    }
+}
+
+impl<T> IntoStoreError<T> for Result<T, io::Error> {
+    fn with_store_error(self: Self) -> Result<T, StoreError> {
+        self.map_err(|err| {
+            StoreError::Io(err)
         })
     }
 }

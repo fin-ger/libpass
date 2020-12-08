@@ -12,9 +12,6 @@ use async_trait::async_trait;
 use cucumber_rust::{given, then, when, World, WorldInit};
 use pass::{Store, StoreError, Location, Sorting, TraversalOrder};
 
-//it should create a new password store if none available with provided GPG keys
-//it should create a new password store if none available when git is not configured
-//it should create a new password store if none available when there is no GPG ID
 //it should open an existing password store at the default location
 //it should open an existing password store from the environment variable
 //it should open an existing password store at a manually provided location
@@ -292,8 +289,8 @@ fn password_store_is_successfully(world: &mut IncrementalWorld) {
     }
 }
 
-#[then("the initialization of the password store fails")]
-fn the_initialization_of_the_password_store_fails(world: &mut IncrementalWorld) {
+#[then(regex = "the (.*) of the password store fails")]
+fn the_operation_of_the_password_store_fails(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
