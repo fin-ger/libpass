@@ -18,6 +18,9 @@ anyhow = "1.0.34"
 async-trait = "0.1.42"
 futures = "0.3.8"
 tempdir = "0.3.7"
+tar = "0.4.30"
+base64 = "0.13.0"
+zstd = "0.5.3"
 
 [dev-dependencies.cucumber_rust]
 git = "https://github.com/bbqsrc/cucumber-rust"
