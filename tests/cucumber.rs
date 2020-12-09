@@ -220,7 +220,7 @@ fn passwords_are_stored_in_the_password_store(world: &mut IncrementalWorld) {
     }
 }
 
-#[when("a new password store is initialized")]
+#[given("a new password store is initialized")]
 fn a_new_password_store_is_initialized(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
@@ -235,7 +235,7 @@ fn a_new_password_store_is_initialized(world: &mut IncrementalWorld) {
     }
 }
 
-#[when(regex = "a password store is opened (.*)")]
+#[given(regex = "a password store is opened (.*)")]
 fn a_password_store_is_opened(world: &mut IncrementalWorld, location: String) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
