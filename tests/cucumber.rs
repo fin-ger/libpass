@@ -14,18 +14,7 @@ use base64::read::DecoderReader;
 use zstd::stream::read::Decoder;
 use tar::Archive;
 
-//it should be able to set GPG id's for subdirectories in the password store
-//it should be able to traverse in level-order over all entries in the store
-//it should be able to traverse in pre-order over all entries in the store
-//it should be able to traverse in post-order over all entries in the store
-//it should be able to programmatically walk over all directories contained in the store
-//it sbould be able to programmatically walk over all passwords contained in the store
-//it should use the next-in-parents gpg-id's stored in the password store to decrypt passwords
-//it should use the next-in-parents gpg-id's stored in the password store to encrypt passwords
-//it should be able to create a QR code for each field in the decrypted password and for the whole file
 //it should be possible to provide a custom password provider for the whole password store (instead of the system agent)
-//it should use the gpg-id's from the environment variable if specified to decrypt passwords
-//it should use the gpg-id's from the environment variable if specified to encrypt passwords
 //it should be able to create a git commit when a new password was created
 //it should be able to create a git commit when a password was edited
 //it should be able to create a git commit when a password was removed
@@ -40,14 +29,13 @@ use tar::Archive;
 //it should be able to resolve a merge-conflict while pulling by letting the user resolve the conflict from decrpyted passwords
 //it should be able to search for a filename in the password store
 //it should be able to search for password-content in the password store
-//it should be able to generate a password with respect to symbols and length
-//it should be able to generate a password with respect to PASSWORD_STORE_GENERATED_LENGTH
-//it should be able to generate a password with respect to PASSWORD_STORE_CHARACTER_SET
-//it should be able to generate a password with respect to PASSWORD_STORE_CHARACTER_SET_NO_SYMBOLS
 //it should sign gpg-id files according to PASSWORD_STORE_SIGNING_KEY's
 //it should place a password in the clipboard for PASSWORD_STORE_CLIP_TIME seconds
 //it should place a password in the clipboard with respect to PASSWORD_STORE_X_SELECTION
 //it should modify all files in the password store with respect to PASSWORD_STORE_UMASK
+//it should warn the user if PASSWORD_STORE_GENERATED_LENGTH is set (due to security reasons)
+//it should warn the user if PASSWORD_STORE_CHARACTER_SET is set (due to security reasons)
+//it should warn the user if PASSWORD_STORE_CHARACTER_SET_NO_SYMBOLS is set (due to security reasons)
 //it should warn the user if PASSWORD_STORE_ENABLE_EXTENSIONS is set (no support)
 //it should warn the user if PASSWORD_STORE_EXTENSIONS_DIR is set (no support)
 //it should (for now) warn the user if PASSWORD_STORE_GPG_OPTS is set as these cannot be parsed by the library

@@ -27,6 +27,7 @@ fn create_pgp_id() -> anyhow::Result<String> {
     Ok(key_id.to_string())
 }
 
+#[test]
 #[ignore]
 fn generate_gnupg_home() -> anyhow::Result<()> {
     let home = TempDir::new("libpass-tests")
