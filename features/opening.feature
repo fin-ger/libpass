@@ -10,7 +10,7 @@ Feature: Open an existing password store
     Given no password store exists
     And a password store is opened at the default location
     Then the opening of the password store fails
-    
+
   Scenario: Open an existing password store from the environment variable
     Given a password store exists from the environment variable
     And a password store is opened from the environment variable

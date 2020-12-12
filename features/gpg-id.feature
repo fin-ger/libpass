@@ -35,3 +35,26 @@ Feature: Using GPG IDs
     When the password store is successfully opened
     And a password is created
     Then the password is encrypted using the foreign GPG ID
+
+  Scenario: GPG IDs are signed if a signing key is manually specified
+    Given a password store exists at the default location
+    And a signing key is manually specified
+    And a password store is opened at the default location
+    When the password store is successfully opened
+    Then the GPG IDs in the password store are signed
+
+  Scenario: GPG IDs are not signed no signing key is specified
+    Given a password store exists at the default location
+    And no signing key is specified
+    And automatic signing key detection is used
+    And a password store is opened at the default location
+    Then the GPG IDs in the password store are not signed
+    And a store error is emitted that a missing signing key is insecure
+
+  Scenario: GPG IDs are signed if a signing key is specified over the environment
+    Given a password store exists at the default location
+    And a signing key is specified in the environment
+    And automatic signing key detection is used
+    And a password store is opened at the default location
+    When the password store is successfully opened
+    Then the GPG IDs in the password store are signed
