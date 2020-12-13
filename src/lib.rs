@@ -14,8 +14,8 @@ pub use git::*;
 
 #[cfg(test)]
 mod tests {
-    use anyhow::{Result, Context};
-    use crate::{Store, Location, Sorting, Directory, TraversalOrder};
+    use anyhow::Result;
+    use crate::{Store, Location, Sorting, Directory};
 
     fn print_dir(dir: &Directory<'_>) {
         println!("Passwords:");
@@ -56,40 +56,6 @@ mod tests {
         let content = store.content();
         println!(">>> no sorting <<<");
         print_dir(&content);
-        Ok(())
-    }
-
-    #[test]
-    fn decrypt() -> Result<()> {
-        let store = Store::open(Location::Automatic)?
-            .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
-        print_errors(&store);
-        assert!(!store.has_errors());
-        let content = store.content();
-        let dir = content.directories().next().context("no directories")?;
-        let pass = dir.passwords().next().context("no passwords")?;
-        let decrypt = pass.decrypt()?;
-        println!("{}:", pass.path().display());
-        println!("  password: {}", decrypt.password());
-        println!("  comments: {:#?}", decrypt.comments());
-        println!("  entries: {:#?}", decrypt.all_entries());
-
-        Ok(())
-    }
-
-    #[test]
-    fn traversal() -> Result<()> {
-        let store = Store::open(Location::Automatic)?
-            .with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
-        print_errors(&store);
-        assert!(!store.has_errors());
-
-        println!(">>> traversal <<<");
-        for entry in store.traverse_recursive(TraversalOrder::PostOrder) {
-            let kind = if entry.is_password() { "PW" } else { "DIR" };
-            println!("  {} {}: {}", kind, entry.path().display(), entry.name());
-        }
-
         Ok(())
     }
 
