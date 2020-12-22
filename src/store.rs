@@ -2,11 +2,13 @@ use std::{env, fs, io};
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::iter::Skip;
+use std::io::Write;
 
 use thiserror::Error;
 use id_tree::{Tree, Node, NodeId, InsertBehavior, LevelOrderTraversalIds, PostOrderTraversalIds, PreOrderTraversalIds};
 use directories::BaseDirs;
 use bitflags::bitflags;
+use gpgme::PassphraseRequest;
 
 use crate::{Directory, StoreReadError, IntoStoreReadError};
 
@@ -15,6 +17,29 @@ pub enum Location {
     Automatic,
     /// Override the path
     Manual(PathBuf),
+}
+
+impl<P> From<P> for Location
+where
+    P: Into<PathBuf>
+{
+    fn from(path: P) -> Location {
+        Location::Manual(path.into())
+    }
+}
+
+pub enum PassphraseProvider {
+    SystemAgent,
+    Manual(Box<dyn FnMut(PassphraseRequest, &mut dyn Write) -> Result<(), gpgme::Error>>),
+}
+
+impl<F> From<F> for PassphraseProvider
+where
+    F: FnMut(PassphraseRequest, &mut dyn Write) -> Result<(), gpgme::Error> + 'static
+{
+    fn from(func: F) -> PassphraseProvider {
+        PassphraseProvider::Manual(Box::new(func))
+    }
 }
 
 #[derive(Clone)]
@@ -92,11 +117,20 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn init(_location: Location, _key_id: String) -> Result<Self, StoreError> {
+    pub(crate) fn init(
+        _location: Location,
+        _passphrase_provider: PassphraseProvider,
+        _umask: u32,
+        _key_id: &str,
+    ) -> Result<Self, StoreError> {
         unimplemented!();
     }
 
-    pub fn open(location: Location) -> Result<Self, StoreError> {
+    pub(crate) fn open(
+        location: Location,
+        _passphrase_provider: PassphraseProvider,
+        _umask: u32,
+    ) -> Result<Self, StoreError> {
         let path = match location {
             Location::Automatic => {
                 env::var("PASSWORD_STORE_DIR")

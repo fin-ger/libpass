@@ -1,7 +1,7 @@
 use std::panic::AssertUnwindSafe;
 
 use cucumber_rust::{given, when, then};
-use pass::{Store, Location};
+use pass::{StoreBuilder, Location};
 
 use crate::world::IncrementalWorld;
 
@@ -27,7 +27,11 @@ fn a_new_password_store_is_initialized(world: &mut IncrementalWorld, location: S
             },
         };
         *world = IncrementalWorld::Created {
-            store: AssertUnwindSafe(Store::init(location, key_id)),
+            store: AssertUnwindSafe(
+                StoreBuilder::default()
+                    .location(location)
+                    .init(&key_id)
+            ),
             home,
         };
     } else {
@@ -57,7 +61,11 @@ fn a_password_store_is_opened(world: &mut IncrementalWorld, location: String) {
             },
         };
         *world = IncrementalWorld::Created {
-            store: AssertUnwindSafe(Store::open(location)),
+            store: AssertUnwindSafe(
+                StoreBuilder::default()
+                    .location(location)
+                    .open()
+            ),
             home,
         };
     } else {
