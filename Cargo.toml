@@ -29,4 +29,5 @@ features = ["macros"]
 
 [[test]]
 name = "cucumber"
+path = "tests/cucumber/mod.rs"
 harness = false
