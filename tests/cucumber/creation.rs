@@ -70,7 +70,8 @@ fn the_password_store_umask_environment_variable_is_set_to_027(world: &mut Incre
 #[given("a password store directory is set in the environment")]
 fn a_password_store_directory_is_set_in_the_environment(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Prepared { envs, .. } = world {
-        env::set_var("PASSWORD_STORE_DIR", 
+        //env::set_var("PASSWORD_STORE_DIR",
+        // TODO
     }
 }
 
