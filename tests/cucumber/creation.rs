@@ -1,9 +1,78 @@
 use std::panic::AssertUnwindSafe;
+use std::io::Write;
+use std::env;
 
 use cucumber_rust::{given, when, then};
-use pass::{StoreBuilder, Location};
+use pass::{StoreBuilder, Location, PassphraseProvider, Umask};
+use gpgme::PassphraseRequest;
 
 use crate::world::IncrementalWorld;
+
+#[given("a passphrase provider is available")]
+fn a_password_provider_is_available(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared {
+        builder: AssertUnwindSafe(ref mut builder),
+        ..
+    } = world {
+        *builder = builder.clone().passphrase_provider(
+            |_req: PassphraseRequest, w: &mut dyn Write| {
+                w.write_all(b"test1234\n").unwrap();
+                Ok(())
+            }
+        );
+    }
+}
+
+#[given("the system agent is used to unlock passwords")]
+fn the_system_agent_is_used_to_unlock_passwords(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared {
+        builder: AssertUnwindSafe(ref mut builder),
+        ..
+    } = world {
+        *builder = builder
+            .clone()
+            .passphrase_provider(PassphraseProvider::SystemAgent);
+    }
+}
+
+#[given("the password store umask is automatically detected")]
+fn the_password_store_umask_is_automatically_detected(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared {
+        builder: AssertUnwindSafe(ref mut builder),
+        ..
+    } = world {
+        *builder = builder
+            .clone()
+            .umask(Umask::Automatic);
+    }
+}
+
+#[given("the password store umask is manually set to 027")]
+fn the_password_store_umask_is_manually_set_to_027(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared {
+        builder: AssertUnwindSafe(ref mut builder),
+        ..
+    } = world {
+        *builder = builder
+            .clone()
+            .umask(0o027 as u32);
+    }
+}
+
+#[given("the password store umask environment variable is set to 027")]
+fn the_password_store_umask_environment_variable_is_set_to_027(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, .. } = world {
+        env::set_var("PASSWORD_STORE_UMASK", "027");
+        envs.insert("PASSWORD_STORE_UMASK".to_string(), "027".to_string());
+    }
+}
+
+#[given("a password store directory is set in the environment")]
+fn a_password_store_directory_is_set_in_the_environment(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, .. } = world {
+        env::set_var("PASSWORD_STORE_DIR", 
+    }
+}
 
 #[given(regex = "a new password store is initialized(.*)")]
 fn a_new_password_store_is_initialized(world: &mut IncrementalWorld, location: String) {

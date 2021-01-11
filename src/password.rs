@@ -24,7 +24,7 @@ impl DecryptedPassword {
         let mut ctx = Context::from_protocol(Protocol::OpenPgp)
             .with_store_read_error(path)?;
         let mut content = Vec::new();
-        // TODO: Add password provider
+        // TODO: Add passphrase provider
         ctx.decrypt(&mut pw, &mut content)
             .with_store_read_error(path)?;
 

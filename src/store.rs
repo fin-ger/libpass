@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::iter::Skip;
 use std::io::Write;
+use std::sync::Arc;
 
 use thiserror::Error;
 use id_tree::{Tree, Node, NodeId, InsertBehavior, LevelOrderTraversalIds, PostOrderTraversalIds, PreOrderTraversalIds};
@@ -12,6 +13,7 @@ use gpgme::PassphraseRequest;
 
 use crate::{Directory, StoreReadError, IntoStoreReadError};
 
+#[derive(Debug, Clone)]
 pub enum Location {
     /// $PASSWORD_STORE_DIR or if not set ~/.password-store
     Automatic,
@@ -28,9 +30,43 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum Umask {
+    Automatic,
+    Manual(u32),
+}
+
+impl<I> From<I> for Umask
+where
+    I: Into<u32>
+{
+    fn from(mask: I) -> Umask {
+        Umask::Manual(mask.into())
+    }
+}
+
+#[derive(Clone)]
 pub enum PassphraseProvider {
     SystemAgent,
-    Manual(Box<dyn FnMut(PassphraseRequest, &mut dyn Write) -> Result<(), gpgme::Error>>),
+    Manual(Arc<dyn FnMut(PassphraseRequest, &mut dyn Write) -> Result<(), gpgme::Error>>),
+}
+
+impl std::fmt::Debug for PassphraseProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PassphraseProvider::SystemAgent => {
+                let mut debug_trait_builder = f.debug_tuple("SystemAgent");
+                debug_trait_builder.finish()
+            },
+            PassphraseProvider::Manual(_) => {
+                let mut debug_trait_builder = f.debug_tuple("Manual");
+                debug_trait_builder.field(&String::from(
+                    "(PassphraseRequest, &mut dyn Write) -> Result<(), gpgme::Error>"
+                ));
+                debug_trait_builder.finish()
+            },
+        }
+    }
 }
 
 impl<F> From<F> for PassphraseProvider
@@ -38,7 +74,7 @@ where
     F: FnMut(PassphraseRequest, &mut dyn Write) -> Result<(), gpgme::Error> + 'static
 {
     fn from(func: F) -> PassphraseProvider {
-        PassphraseProvider::Manual(Box::new(func))
+        PassphraseProvider::Manual(Arc::new(func))
     }
 }
 
@@ -120,7 +156,7 @@ impl Store {
     pub(crate) fn init(
         _location: Location,
         _passphrase_provider: PassphraseProvider,
-        _umask: u32,
+        _umask: Umask,
         _key_id: &str,
     ) -> Result<Self, StoreError> {
         unimplemented!();
@@ -129,7 +165,7 @@ impl Store {
     pub(crate) fn open(
         location: Location,
         _passphrase_provider: PassphraseProvider,
-        _umask: u32,
+        _umask: Umask,
     ) -> Result<Self, StoreError> {
         let path = match location {
             Location::Automatic => {

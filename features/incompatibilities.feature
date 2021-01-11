@@ -1,7 +1,7 @@
 Feature: Incompatibilities with the upstream pass implementation
   Scenario: Produce an error if the password store directory is overridden over the environment
     Given a password store exists
-    And a the password store directory is set in the environment
+    And a password store directory is set in the environment
     And a password store is opened
     When the password store is successfully opened
     Then a store error is emitted that the overridden password store directory from the environment is a security risk

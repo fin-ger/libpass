@@ -8,7 +8,7 @@ use anyhow::Context as AnyhowContext;
 use tempdir::TempDir;
 use async_trait::async_trait;
 use cucumber_rust::{World, WorldInit};
-use pass::{Store, StoreError};
+use pass::{Store, StoreError, StoreBuilder};
 use base64::read::DecoderReader;
 use zstd::stream::read::Decoder;
 use tar::Archive;
@@ -19,6 +19,7 @@ pub enum IncrementalWorld {
     Initial,
     Prepared {
         envs: HashMap<String, String>,
+        builder: AssertUnwindSafe<StoreBuilder>,
         home: TempDir,
         key_id: String,
         name: &'static str,
@@ -67,9 +68,11 @@ impl IncrementalWorld {
         envs.insert("HOME".to_string(), home.path().display().to_string());
 
         let key_id = initialize_pgp_home()?;
+        let builder = AssertUnwindSafe(StoreBuilder::default());
 
         Ok(IncrementalWorld::Prepared {
             envs,
+            builder,
             home,
             key_id,
             name,

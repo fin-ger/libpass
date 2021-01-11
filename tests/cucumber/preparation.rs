@@ -94,3 +94,48 @@ fn passwords_are_stored_in_the_password_store(world: &mut IncrementalWorld) {
         panic!("World state is not Prepared!");
     }
 }
+
+#[given("the repository's remote contains new commits")]
+fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, home, .. } = world {
+        let password_store_dir =
+            if let Ok(path) = std::env::var("PASSWORD_STORE_DIR") {
+                path.into()
+            } else if let Some(path) = envs.get("PASSWORD_STORE_DIR") {
+                path.into()
+            } else {
+                home.path().join(".password-store")
+            };
+        let password_store_remote =
+            home.path().join("password-store-remote");
+
+        copy_dir::copy_dir(&password_store_dir, &password_store_remote)
+            .unwrap();
+
+        Command::new("git")
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(password_store_remote.join(".git").display().to_string())
+            .current_dir(&password_store_dir)
+            .output()
+            .expect("failed to set origin in password store");
+
+        let content = "jean#luc\nusername: captain\n";
+        let mut child = Command::new("pass")
+            .args(&["insert", "--multiline", "Entertainment/Music Library"])
+            .envs(envs)
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote.display().to_string(),
+            )
+            .stdin(Stdio::piped())
+            .spawn()
+            .unwrap();
+
+        let stdin = child.stdin.as_mut().unwrap();
+        stdin.write_all(content.as_bytes()).unwrap();
+        let status = child.wait().unwrap();
+        assert!(status.success(), "Failed to insert password into pass repository!");
+    }
+}

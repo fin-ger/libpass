@@ -1,9 +1,10 @@
-use crate::{Store, StoreError, Location, PassphraseProvider};
+use crate::{Store, StoreError, Location, PassphraseProvider, Umask};
 
+#[derive(Debug, Clone)]
 pub struct StoreBuilder {
     location: Location,
     passphrase_provider: PassphraseProvider,
-    umask: u32,
+    umask: Umask,
 }
 
 impl Default for StoreBuilder {
@@ -11,15 +12,18 @@ impl Default for StoreBuilder {
         Self {
             location: Location::Automatic,
             passphrase_provider: PassphraseProvider::SystemAgent,
-            umask: 0o077,
+            umask: Umask::Automatic,
         }
     }
 }
 
 impl StoreBuilder {
-    pub fn location(self, location: Location) -> Self {
+    pub fn location<L>(self, location: L) -> Self
+    where
+        L: Into<Location>
+    {
         Self {
-            location,
+            location: location.into(),
             ..self
         }
     }
@@ -34,9 +38,12 @@ impl StoreBuilder {
         }
     }
 
-    pub fn umask(self, umask: u32) -> Self {
+    pub fn umask<U>(self, umask: U) -> Self
+    where
+        U: Into<Umask>
+    {
         Self {
-            umask,
+            umask: umask.into(),
             ..self
         }
     }

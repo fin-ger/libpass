@@ -1,17 +1,17 @@
 Feature: General password store operations
-  Scenario: Setting a custom password provider when creating a password store
+  Scenario: Setting a custom passphrase provider when creating a password store
     Given a password store exists
-    And a password provider is available
+    And a passphrase provider is available
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
     Then the passphrase can be read
 
-  Scenario: Setting a different password provider on an existing password store
+  Scenario: Setting a different passphrase provider on an existing password store
     Given a password store exists
     And a password store is opened
     When the password store is successfully opened
-    And a password provider is set
+    And a passphrase provider is set
     And a password is opened
     Then the passphrase can be read
 
@@ -69,17 +69,17 @@ Feature: General password store operations
 
   Scenario: New files in the password store should respect a manually provided umask
     Given a password store exists
-    And the password store umask is manually set to 177
+    And the password store umask is manually set to 027
     And a password store is opened
     When the password store is successfully opened
     And a new password is created
-    Then the new password respects umask 177
+    Then the new password respects umask 027
 
   Scenario: New files in the password store should respect an umask from the environment
     Given a password store exists
-    And the password store umask environment variable is set to 177
+    And the password store umask environment variable is set to 027
     And the password store umask is automatically detected
-    And the password store is opened
+    And a password store is opened
     When the password store is successfully opened
     And a new password is created
-    Then the new password respects umask 177
+    Then the new password respects umask 027

@@ -11,7 +11,7 @@ fn create_pgp_id() -> anyhow::Result<String> {
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)
         .context("Could not create GPG context")?
         .set_passphrase_provider(|_req: PassphraseRequest, out: &mut dyn Write| {
-            out.write_all(b"test1234").unwrap();
+            out.write_all(b"test1234\n").unwrap();
             Ok(())
         });
     ctx.set_pinentry_mode(PinentryMode::Loopback)
