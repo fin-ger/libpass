@@ -1,4 +1,4 @@
-use crate::{Store, StoreError, Location, PassphraseProvider, Umask, SigningKey};
+use crate::{Store, StoreError, Location, PassphraseProvider, Umask, SigningKey, Sorting};
 
 #[derive(Debug, Clone)]
 pub struct StoreBuilder {
@@ -6,6 +6,7 @@ pub struct StoreBuilder {
     passphrase_provider: PassphraseProvider,
     umask: Umask,
     signing_key: SigningKey,
+    sorting: Sorting,
 }
 
 impl Default for StoreBuilder {
@@ -15,7 +16,7 @@ impl Default for StoreBuilder {
             passphrase_provider: PassphraseProvider::SystemAgent,
             umask: Umask::Automatic,
             signing_key: SigningKey::Automatic,
-
+            sorting: Sorting::NONE,
         }
     }
 }
@@ -61,12 +62,23 @@ impl StoreBuilder {
         }
     }
 
+    pub fn sorting<S>(self, sorting: S) -> Self
+    where
+        S: Into<Sorting>
+    {
+        Self {
+            sorting: sorting.into(),
+            ..self
+        }
+    }
+
     pub fn init(self, gpg_id: &str) -> Result<Store, StoreError> {
         Store::init(
             self.location,
             self.passphrase_provider,
             self.umask,
             self.signing_key,
+            self.sorting,
             gpg_id,
         )
     }
@@ -77,6 +89,7 @@ impl StoreBuilder {
             self.passphrase_provider,
             self.umask,
             self.signing_key,
+            self.sorting,
         )
     }
 }

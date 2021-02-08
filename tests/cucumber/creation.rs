@@ -3,7 +3,7 @@ use std::io::Write;
 use std::env;
 
 use cucumber_rust::{given, when, then};
-use pass::{StoreBuilder, Location, PassphraseProvider, Umask, SigningKey};
+use pass::{Location, PassphraseProvider, SigningKey, Sorting, StoreBuilder, Umask};
 use gpgme::PassphraseRequest;
 
 use crate::world::IncrementalWorld;
@@ -88,6 +88,20 @@ fn automatic_signing_key_detection_is_used(world: &mut IncrementalWorld) {
         *builder = builder
             .clone()
             .signing_key(SigningKey::Automatic);
+    } else {
+        panic!("World state is not Prepared!");
+    }
+}
+
+#[given("the passwords in the store are sorted")]
+fn the_passwords_in_the_store_are_sorted(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared {
+        builder: AssertUnwindSafe(ref mut builder),
+        ..
+    } = world {
+        *builder = builder
+            .clone()
+            .sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
     } else {
         panic!("World state is not Prepared!");
     }

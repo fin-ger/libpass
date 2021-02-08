@@ -1,6 +1,7 @@
 Feature: Working with passwords
   Scenario: Opening a password and reading the passphrase
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -8,6 +9,7 @@ Feature: Working with passwords
 
   Scenario: Opening a password and reading a comment
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -15,6 +17,7 @@ Feature: Working with passwords
 
   Scenario: Opening a password and reading an entry
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -22,6 +25,7 @@ Feature: Working with passwords
 
   Scenario: Opening a password and creating a QR code for passphrase
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -29,6 +33,7 @@ Feature: Working with passwords
 
   Scenario: Opening a password and creating a QR code for comment
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -36,6 +41,7 @@ Feature: Working with passwords
 
   Scenario: Opening a password and creating a QR code for entry
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -43,6 +49,7 @@ Feature: Working with passwords
 
   Scenario: Opening a password and creating a QR code for whole password file
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -50,6 +57,7 @@ Feature: Working with passwords
 
   Scenario: Create a QR code for encrypted password file
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     Then a QR code can be created for an encrypted password
@@ -70,6 +78,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by generating a new passphrase
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -78,6 +87,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by editing an entry
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -86,6 +96,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by editing a comment
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -94,6 +105,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by adding an entry
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -102,6 +114,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by adding a comment
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -110,6 +123,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by inserting an entry
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -118,6 +132,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by inserting a comment
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -126,6 +141,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by removing an entry
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -134,6 +150,7 @@ Feature: Working with passwords
 
   Scenario: Editing a password by removing a comment
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
@@ -142,6 +159,7 @@ Feature: Working with passwords
 
   Scenario: Removing a password
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is removed
@@ -149,6 +167,7 @@ Feature: Working with passwords
 
   Scenario: Renaming a password
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is renamed
@@ -156,6 +175,7 @@ Feature: Working with passwords
 
   Scenario: Copying a password
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is copied

@@ -1,7 +1,7 @@
 use std::panic::AssertUnwindSafe;
 
 use cucumber_rust::{when, then};
-use pass::{Sorting, TraversalOrder};
+use pass::TraversalOrder;
 
 use crate::world::IncrementalWorld;
 use crate::{DIR, PW};
@@ -78,7 +78,7 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
             (PW, "Manufacturers/Yoyodyne.gpg"),
             (PW, "Entertainment/Holo Deck/Broht & Forrester.gpg"),
         ];
-        let store = store.0.with_sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        let store = store.0;
         let actual = store.traverse_recursive(TraversalOrder::LevelOrder);
 
         for (ref entry, (is_dir, expected)) in actual.zip(&expected) {

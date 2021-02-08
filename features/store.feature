@@ -8,15 +8,6 @@ Feature: General password store operations
     And a password is opened
     Then the passphrase can be read
 
-  Scenario: Setting a different passphrase provider on an existing password store
-    Given a password store exists
-    And passwords are stored in the password store
-    And a password store is opened
-    When the password store is successfully opened
-    And a passphrase provider is set
-    And a password is opened
-    Then the passphrase can be read
-
   Scenario: Using the system agent to unlock passwords when creating a password store
     Given a password store exists
     And passwords are stored in the password store

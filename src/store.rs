@@ -173,6 +173,7 @@ impl Store {
         _passphrase_provider: PassphraseProvider,
         _umask: Umask,
         _signing_key: SigningKey,
+        _sorting: Sorting,
         _key_id: &str,
     ) -> Result<Self, StoreError> {
         unimplemented!();
@@ -183,6 +184,7 @@ impl Store {
         _passphrase_provider: PassphraseProvider,
         _umask: Umask,
         _signing_key: SigningKey,
+        sorting: Sorting,
     ) -> Result<Self, StoreError> {
         let path = match location {
             Location::Automatic => {
@@ -213,13 +215,9 @@ impl Store {
             errors: Vec::new(),
         };
         me.load_passwords();
+        me.sort(sorting);
 
         Ok(me)
-    }
-
-    pub fn with_sorting(mut self, sorting: Sorting) -> Self {
-        self.sort(sorting);
-        self
     }
 
     pub fn has_errors(&self) -> bool {
@@ -231,6 +229,10 @@ impl Store {
     }
 
     pub fn sort(&mut self, sorting: Sorting) {
+        if sorting.contains(Sorting::NONE) {
+            return
+        }
+
         let root_id = self.tree.root_node_id()
             .expect("Cannot find root node in internal tree").clone();
         let level_order = self.tree.traverse_level_order_ids(&root_id)
