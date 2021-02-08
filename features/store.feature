@@ -1,6 +1,7 @@
 Feature: General password store operations
   Scenario: Setting a custom passphrase provider when creating a password store
     Given a password store exists
+    And passwords are stored in the password store
     And a passphrase provider is available
     And a password store is opened
     When the password store is successfully opened
@@ -9,6 +10,7 @@ Feature: General password store operations
 
   Scenario: Setting a different passphrase provider on an existing password store
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a passphrase provider is set
@@ -17,6 +19,7 @@ Feature: General password store operations
 
   Scenario: Using the system agent to unlock passwords when creating a password store
     Given a password store exists
+    And passwords are stored in the password store
     And the system agent is used to unlock passwords
     And a password store is opened
     When the password store is successfully opened
@@ -25,6 +28,7 @@ Feature: General password store operations
 
   Scenario: Using the system agent to unlock passwords on an existing password store
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And the system agent is set to unlock passwords
@@ -33,6 +37,7 @@ Feature: General password store operations
 
   Scenario: Searching for a password in the password store succeeds
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And an existing password is searched in the password store
@@ -47,6 +52,7 @@ Feature: General password store operations
 
   Scenario: Searching for password content in the password store succeeds
     Given a password store exists
+    And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And content of an existing password is searched in the password store

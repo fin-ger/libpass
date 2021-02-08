@@ -45,6 +45,21 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum SigningKey {
+    Automatic,
+    Manual(String),
+}
+
+impl<K> From<K> for SigningKey
+where
+    K: Into<String>
+{
+    fn from(signing_key: K) -> SigningKey {
+        SigningKey::Manual(signing_key.into())
+    }
+}
+
 #[derive(Clone)]
 pub enum PassphraseProvider {
     SystemAgent,
@@ -157,6 +172,7 @@ impl Store {
         _location: Location,
         _passphrase_provider: PassphraseProvider,
         _umask: Umask,
+        _signing_key: SigningKey,
         _key_id: &str,
     ) -> Result<Self, StoreError> {
         unimplemented!();
@@ -166,6 +182,7 @@ impl Store {
         location: Location,
         _passphrase_provider: PassphraseProvider,
         _umask: Umask,
+        _signing_key: SigningKey,
     ) -> Result<Self, StoreError> {
         let path = match location {
             Location::Automatic => {
@@ -298,7 +315,7 @@ impl Store {
         self.errors.extend(errors);
     }
 
-    pub fn content(&self) -> Directory {
+    pub fn content<'a>(&'a self) -> Directory<'a> {
         let root_id = self.tree.root_node_id()
             .expect("Failed to get root node of internal tree");
         Directory::new(".", &self.path, &self.tree, root_id)

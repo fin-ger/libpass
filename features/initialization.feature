@@ -9,8 +9,8 @@ Feature: Initialize a new password store
     And the password store's directory contains a GPG ID file
 
   Scenario: A new password store is created from the environment
-    Given the password store location is set in the environment
-    And no password store exists
+    Given no password store exists
+    And the password store location is set in the environment
     And a new password store is initialized
     When a new password store is successfully created
     Then the password store has no errors

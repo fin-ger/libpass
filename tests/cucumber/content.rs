@@ -1,6 +1,6 @@
 use std::panic::AssertUnwindSafe;
 
-use cucumber_rust::then;
+use cucumber_rust::{when, then};
 use pass::{Sorting, TraversalOrder};
 
 use crate::world::IncrementalWorld;
@@ -100,6 +100,27 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
         }
 
         *world = IncrementalWorld::Successful { store: AssertUnwindSafe(store), home };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a password is opened")]
+fn a_password_is_opened(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { store, .. } = world {
+        let content = store.content();
+        let filter = content.directories().filter(|d| d.name() == "Manufacturers").next();
+        let manufacturers = if let Some(dir) = filter { dir } else {
+            panic!("Manufacturers directory not found in password store!");
+        };
+
+        let filter = manufacturers.passwords().filter(|pw| pw.name() == "StrutCo").next();
+        let strutco = if let Some(pw) = filter { pw } else {
+            panic!("Manufacturers/StrutCo password not found in password store!");
+        };
+
+        let password = strutco.decrypt().expect("Decrypting Manufacturers/StrutCo failed");
+        *world = IncrementalWorld::DecryptedPassword { password };
     } else {
         panic!("World state is not Successful!");
     }

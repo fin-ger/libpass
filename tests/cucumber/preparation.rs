@@ -10,8 +10,12 @@ use crate::world::IncrementalWorld;
 fn no_password_store_exists(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Initial = world {
         *world = IncrementalWorld::clean_env("no-password-store").unwrap();
+    }
+
+    if let IncrementalWorld::Prepared { .. } = world {
+        // nop
     } else {
-        panic!("World state is not Initial!");
+        panic!("World state is not Prepared!");
     }
 }
 
@@ -19,38 +23,38 @@ fn no_password_store_exists(world: &mut IncrementalWorld) {
 fn a_password_store_exists(world: &mut IncrementalWorld, location: String) {
     if let IncrementalWorld::Initial = world {
         *world = IncrementalWorld::clean_env("password-store").unwrap();
-        if let IncrementalWorld::Prepared { envs, key_id, home, .. } = world {
-            match location.as_str() {
-                "" => {},
-                " at a manually provided location" => {
-                    let path = home.path().join("custom-password-store");
-                    envs.insert("PASSWORD_STORE_DIR".to_owned(), format!("{}", path.display()));
-                },
-                _ => {
-                    panic!(format!(
-                        "Invalid location '{}' for password insertion!",
-                        location,
-                    ));
-                },
+    }
 
-            };
-            let status = Command::new("pass")
-                .args(&["init", key_id.as_str()])
-                .envs(envs)
-                .status()
-                .unwrap();
-            assert!(status.success(), "Failed to initialize pass repository!");
-        } else {
-            panic!("World state is not Prepared!");
-        }
+    if let IncrementalWorld::Prepared { envs, key_id, home, .. } = world {
+        match location.as_str() {
+            "" => {},
+            " at a manually provided location" => {
+                let path = home.path().join("custom-password-store");
+                envs.insert("PASSWORD_STORE_DIR".to_owned(), format!("{}", path.display()));
+            },
+            _ => {
+                panic!(format!(
+                    "Invalid location '{}' for password insertion!",
+                    location,
+                ));
+            },
+        };
+
+        let status = Command::new("pass")
+            .args(&["init", key_id.as_str()])
+            .envs(envs)
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to initialize pass repository!");
     } else {
-        panic!("World state is not Initial!");
+        panic!("World state is not Prepared!");
     }
 }
 
 fn insert_password(envs: &HashMap<String, String>, name: &str, content: &str) {
     let mut child = Command::new("pass")
         .args(&["insert", "--multiline", name])
+        .env_clear()
         .envs(envs)
         .stdin(Stdio::piped())
         .spawn()
@@ -117,6 +121,7 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
             .arg("add")
             .arg("origin")
             .arg(password_store_remote.join(".git").display().to_string())
+            .envs(envs.clone())
             .current_dir(&password_store_dir)
             .output()
             .expect("failed to set origin in password store");
@@ -137,5 +142,7 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
         stdin.write_all(content.as_bytes()).unwrap();
         let status = child.wait().unwrap();
         assert!(status.success(), "Failed to insert password into pass repository!");
+    } else {
+        panic!("World state is not Prepared!");
     }
 }

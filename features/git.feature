@@ -1,4 +1,4 @@
-Feature: Git operation in the password store
+Feature: Git operations in the password store
   Scenario: Commit a new password
     Given a password store exists
     And a password store is opened

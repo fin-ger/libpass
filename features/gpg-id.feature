@@ -43,7 +43,7 @@ Feature: Using GPG IDs
     When the password store is successfully opened
     Then the GPG IDs in the password store are signed
 
-  Scenario: GPG IDs are not signed no signing key is specified
+  Scenario: GPG IDs are not signed if no signing key is specified
     Given a password store exists
     And no signing key is specified
     And automatic signing key detection is used
