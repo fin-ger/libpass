@@ -1,10 +1,10 @@
-use std::panic::AssertUnwindSafe;
-use std::io::Write;
 use std::env;
+use std::io::Write;
+use std::panic::AssertUnwindSafe;
 
-use cucumber_rust::{given, when, then};
-use pass::{Location, PassphraseProvider, SigningKey, Sorting, StoreBuilder, Umask};
+use cucumber_rust::{given, then, when};
 use gpgme::PassphraseRequest;
+use pass::{Location, PassphraseProvider, SigningKey, Sorting, StoreBuilder, Umask};
 
 use crate::world::IncrementalWorld;
 
@@ -13,13 +13,15 @@ fn a_password_provider_is_available(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Prepared {
         builder: AssertUnwindSafe(ref mut builder),
         ..
-    } = world {
-        *builder = builder.clone().passphrase_provider(
-            |_req: PassphraseRequest, w: &mut dyn Write| {
-                w.write_all(b"test1234\n").unwrap();
-                Ok(())
-            }
-        );
+    } = world
+    {
+        *builder =
+            builder
+                .clone()
+                .passphrase_provider(|_req: PassphraseRequest, w: &mut dyn Write| {
+                    w.write_all(b"test1234\n").unwrap();
+                    Ok(())
+                });
     } else {
         panic!("World state is not Prepared!");
     }
@@ -30,7 +32,8 @@ fn the_system_agent_is_used_to_unlock_passwords(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Prepared {
         builder: AssertUnwindSafe(ref mut builder),
         ..
-    } = world {
+    } = world
+    {
         *builder = builder
             .clone()
             .passphrase_provider(PassphraseProvider::SystemAgent);
@@ -44,10 +47,9 @@ fn the_password_store_umask_is_automatically_detected(world: &mut IncrementalWor
     if let IncrementalWorld::Prepared {
         builder: AssertUnwindSafe(ref mut builder),
         ..
-    } = world {
-        *builder = builder
-            .clone()
-            .umask(Umask::Automatic);
+    } = world
+    {
+        *builder = builder.clone().umask(Umask::Automatic);
     }
 }
 
@@ -56,10 +58,9 @@ fn the_password_store_umask_is_manually_set_to_027(world: &mut IncrementalWorld)
     if let IncrementalWorld::Prepared {
         builder: AssertUnwindSafe(ref mut builder),
         ..
-    } = world {
-        *builder = builder
-            .clone()
-            .umask(0o027 as u32);
+    } = world
+    {
+        *builder = builder.clone().umask(0o027 as u32);
     } else {
         panic!("World state is not Prepared!");
     }
@@ -70,10 +71,9 @@ fn a_signing_key_is_manually_specified(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Prepared {
         builder: AssertUnwindSafe(ref mut builder),
         ..
-    } = world {
-        *builder = builder
-            .clone()
-            .signing_key("test@key.email");
+    } = world
+    {
+        *builder = builder.clone().signing_key("test@key.email");
     } else {
         panic!("World state is not Prepared!");
     }
@@ -84,10 +84,9 @@ fn automatic_signing_key_detection_is_used(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Prepared {
         builder: AssertUnwindSafe(ref mut builder),
         ..
-    } = world {
-        *builder = builder
-            .clone()
-            .signing_key(SigningKey::Automatic);
+    } = world
+    {
+        *builder = builder.clone().signing_key(SigningKey::Automatic);
     } else {
         panic!("World state is not Prepared!");
     }
@@ -98,7 +97,8 @@ fn the_passwords_in_the_store_are_sorted(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Prepared {
         builder: AssertUnwindSafe(ref mut builder),
         ..
-    } = world {
+    } = world
+    {
         *builder = builder
             .clone()
             .sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
@@ -128,7 +128,10 @@ fn a_signing_key_is_specified_in_the_environment(world: &mut IncrementalWorld) {
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_SIGNING_KEY", "test@key.email");
-        envs.insert("PASSWORD_STORE_SIGNING_KEY".to_owned(), "test@key.email".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_SIGNING_KEY".to_owned(),
+            "test@key.email".to_owned(),
+        );
     }
 }
 
@@ -153,7 +156,10 @@ fn a_password_store_directory_is_set_in_the_environment(world: &mut IncrementalW
     if let IncrementalWorld::Prepared { envs, home, .. } = world {
         let path = home.path().join("custom-password-store");
         env::set_var("PASSWORD_STORE_DIR".to_owned(), &path);
-        envs.insert("PASSWORD_STORE_DIR".to_owned(), format!("{}", path.display()));
+        envs.insert(
+            "PASSWORD_STORE_DIR".to_owned(),
+            format!("{}", path.display()),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -182,7 +188,10 @@ fn the_generated_password_length_is_set_in_the_environment(world: &mut Increment
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_GENERATED_LENGTH", "32");
-        envs.insert("PASSWORD_STORE_GENERATED_LENGTH".to_owned(), "32".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_GENERATED_LENGTH".to_owned(),
+            "32".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -210,7 +219,10 @@ fn the_ignored_symbols_are_set_in_the_environment(world: &mut IncrementalWorld) 
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_CHARACTER_SET_NO_SYMBOLS", "[:print:]");
-        envs.insert("PASSWORD_STORE_CHARACTER_SET_NO_SYMBOLS".to_owned(), "[:print:]".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_CHARACTER_SET_NO_SYMBOLS".to_owned(),
+            "[:print:]".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -224,7 +236,10 @@ fn gpg_options_are_set_in_the_environment(world: &mut IncrementalWorld) {
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_GPG_OPTS", "--default-recipient intruder");
-        envs.insert("PASSWORD_STORE_GPG_OPTS".to_owned(), "--default-recipient intruder".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_GPG_OPTS".to_owned(),
+            "--default-recipient intruder".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -238,7 +253,10 @@ fn pass_extensions_are_enabled_in_the_environment(world: &mut IncrementalWorld) 
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_ENABLE_EXTENSIONS", "1");
-        envs.insert("PASSWORD_STORE_ENABLE_EXTENSIONS".to_owned(), "1".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_ENABLE_EXTENSIONS".to_owned(),
+            "1".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -252,7 +270,10 @@ fn pass_extensions_directory_is_set_in_the_environment(world: &mut IncrementalWo
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_EXTENSIONS_DIR", "/evil/extensions/dir");
-        envs.insert("PASSWORD_STORE_EXTENSIONS_DIR".to_owned(), "/evil/extensions/dir".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_EXTENSIONS_DIR".to_owned(),
+            "/evil/extensions/dir".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -266,7 +287,10 @@ fn a_foreign_gpg_id_is_set_via_the_environment(world: &mut IncrementalWorld) {
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_KEY", "test2@key.email");
-        envs.insert("PASSWORD_STORE_KEY".to_owned(), "test2@key.email".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_KEY".to_owned(),
+            "test2@key.email".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -280,7 +304,10 @@ fn the_x_selection_is_set_to_clipboard_in_the_environment(world: &mut Incrementa
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_X_SELECTION", "clipboard");
-        envs.insert("PASSWORD_STORE_X_SELECTION".to_owned(), "clipboard".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_X_SELECTION".to_owned(),
+            "clipboard".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -294,7 +321,10 @@ fn the_x_selection_is_set_to_primary_in_the_environment(world: &mut IncrementalW
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_X_SELECTION", "primary");
-        envs.insert("PASSWORD_STORE_X_SELECTION".to_owned(), "primary".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_X_SELECTION".to_owned(),
+            "primary".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -308,7 +338,10 @@ fn the_x_selection_is_set_to_secondary_in_the_environment(world: &mut Incrementa
 
     if let IncrementalWorld::Prepared { envs, .. } = world {
         env::set_var("PASSWORD_STORE_X_SELECTION", "secondary");
-        envs.insert("PASSWORD_STORE_X_SELECTION".to_owned(), "secondary".to_owned());
+        envs.insert(
+            "PASSWORD_STORE_X_SELECTION".to_owned(),
+            "secondary".to_owned(),
+        );
     } else {
         panic!("World state is not Prepared!");
     }
@@ -321,26 +354,20 @@ fn a_new_password_store_is_initialized(world: &mut IncrementalWorld, location: S
 
     if let IncrementalWorld::Prepared { home, key_id, .. } = prev {
         let location = match location.as_str() {
-            "" => {
-                Location::Automatic
-            },
+            "" => Location::Automatic,
             " at a manually provided location" => {
                 let path = home.path().join("custom-password-store");
                 Location::Manual(path)
-            },
+            }
             _ => {
                 panic!(format!(
                     "Invalid location '{}' for password store initialization!",
                     location,
                 ));
-            },
+            }
         };
         *world = IncrementalWorld::Created {
-            store: AssertUnwindSafe(
-                StoreBuilder::default()
-                    .location(location)
-                    .init(&key_id)
-            ),
+            store: AssertUnwindSafe(StoreBuilder::default().location(location).init(&key_id)),
             home,
         };
     } else {
@@ -355,27 +382,21 @@ fn a_password_store_is_opened(world: &mut IncrementalWorld, location: String) {
 
     if let IncrementalWorld::Prepared { home, .. } = prev {
         let location = match location.as_str() {
-            "" => {
-                Location::Automatic
-            },
+            "" => Location::Automatic,
             " at a manually provided location" => {
                 let path = home.path().join("custom-password-store");
                 Location::Manual(path)
-            },
+            }
             _ => {
                 panic!(format!(
                     "Invalid location '{}' for password store opening!",
                     location,
                 ));
-            },
+            }
         };
 
         *world = IncrementalWorld::Created {
-            store: AssertUnwindSafe(
-                StoreBuilder::default()
-                    .location(location)
-                    .open()
-            ),
+            store: AssertUnwindSafe(StoreBuilder::default().location(location).open()),
             home,
         };
     } else {

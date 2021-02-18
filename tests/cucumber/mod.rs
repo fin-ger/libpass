@@ -3,10 +3,10 @@ mod creation;
 mod preparation;
 mod world;
 
-use std::{env, fs, io::Write, path::Path, process::Command};
 use anyhow::Context as AnyhowContext;
 use cucumber_rust::WorldInit;
 use gpgme::{Context, CreateKeyFlags, PassphraseRequest, PinentryMode, Protocol};
+use std::{env, fs, io::Write, path::Path, process::Command};
 use world::IncrementalWorld;
 
 const DIR: bool = true;
@@ -14,8 +14,8 @@ const PW: bool = false;
 
 fn main() {
     let pgp_home = env::temp_dir().join("libpass-pgp-home");
-    fs::create_dir_all(&pgp_home)
-        .expect("Could not create temporary home folder for PGP home");
+    fs::remove_dir_all(&pgp_home).ok();
+    fs::create_dir_all(&pgp_home).expect("Could not create temporary home folder for PGP home");
     initialize_pgp_home(&pgp_home).expect("Failed to initialize PGP home");
 
     let runner = IncrementalWorld::init(&["./features"]);
@@ -55,14 +55,14 @@ fn initialize_pgp_home(home: &Path) -> anyhow::Result<()> {
         None,
         CreateKeyFlags::SIGN | CreateKeyFlags::ENCR,
     )
-        .context("Failed to create GPG key")?;
+    .context("Failed to create GPG key")?;
     ctx.create_key_with_flags(
         "Test Key 2 <test2@key.email>",
         "default",
         None,
         CreateKeyFlags::SIGN | CreateKeyFlags::ENCR,
     )
-        .context("Failed to create GPG key")?;
+    .context("Failed to create GPG key")?;
     let key = ctx.get_secret_key("test@key.email")?;
     let keygrip = key.subkeys().next().unwrap().keygrip().unwrap();
 

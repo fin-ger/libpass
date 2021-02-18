@@ -1,13 +1,13 @@
-use std::convert::Infallible;
-use std::env;
 use std::collections::HashMap;
+use std::env;
 use std::panic::AssertUnwindSafe;
+use std::{convert::Infallible, path::PathBuf};
 
 use anyhow::Context as AnyhowContext;
-use tempdir::TempDir;
 use async_trait::async_trait;
 use cucumber_rust::{World, WorldInit};
-use pass::{Store, StoreError, StoreBuilder, DecryptedPassword};
+use pass::{DecryptedPassword, Store, StoreBuilder, StoreError};
+use tempdir::TempDir;
 
 #[derive(WorldInit)]
 pub enum IncrementalWorld {
@@ -33,7 +33,13 @@ pub enum IncrementalWorld {
     },
     DecryptedPassword {
         password: DecryptedPassword,
-    }
+    },
+    Search {
+        found_entries: Vec<PathBuf>,
+    },
+    Grep {
+        found_passwords: Vec<DecryptedPassword>,
+    },
 }
 
 #[async_trait(?Send)]
@@ -60,13 +66,25 @@ impl IncrementalWorld {
         env::remove_var("PASSWORD_STORE_EXTENSIONS_DIR");
         env::remove_var("PASSWORD_STORE_SIGNING_KEY");
 
-        let home = TempDir::new(&format!("libpass-{}", name))
-            .context(format!("Could not create temporary home folder for {}", name))?;
+        let home = TempDir::new(&format!("libpass-{}", name)).context(format!(
+            "Could not create temporary home folder for {}",
+            name
+        ))?;
         env::set_var("HOME", home.path());
-        env::set_var("GNUPGHOME", env::temp_dir().join("libpass-pgp-home").join(".gnupg"));
+        env::set_var(
+            "GNUPGHOME",
+            env::temp_dir().join("libpass-pgp-home").join(".gnupg"),
+        );
         let mut envs = HashMap::new();
         envs.insert("HOME".to_string(), home.path().display().to_string());
-        envs.insert("GNUPGHOME".to_string(), env::temp_dir().join("libpass-pgp-home").join(".gnupg").display().to_string());
+        envs.insert(
+            "GNUPGHOME".to_string(),
+            env::temp_dir()
+                .join("libpass-pgp-home")
+                .join(".gnupg")
+                .display()
+                .to_string(),
+        );
 
         let key_id = String::from("test@key.email");
         let builder = AssertUnwindSafe(StoreBuilder::default());

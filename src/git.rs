@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use thiserror::Error;
 use crate::DecryptedPassword;
+use thiserror::Error;
 
 pub struct GitStatus;
 
@@ -10,22 +10,21 @@ pub struct GitRepository {
 }
 
 #[derive(Error, Debug)]
-pub enum GitError {
-}
+pub enum GitError {}
 
 type GitResult<T> = Result<T, GitError>;
 
 impl GitRepository {
     pub fn new(path: PathBuf) -> Self {
-        Self {
-            path
-        }
+        Self { path }
     }
 
     // TODO: handle merge conflict
     //       show user both decrypted passwords and let the user choose which to take
     pub fn pull<H>(&mut self, _merge_handler: H) -> GitResult<()>
-    where H: Fn(&DecryptedPassword, &DecryptedPassword) -> DecryptedPassword {
+    where
+        H: Fn(&DecryptedPassword, &DecryptedPassword) -> DecryptedPassword,
+    {
         Ok(())
     }
 

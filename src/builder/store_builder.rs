@@ -1,4 +1,4 @@
-use crate::{Store, StoreError, Location, PassphraseProvider, Umask, SigningKey, Sorting};
+use crate::{Location, PassphraseProvider, SigningKey, Sorting, Store, StoreError, Umask};
 
 #[derive(Debug, Clone)]
 pub struct StoreBuilder {
@@ -24,7 +24,7 @@ impl Default for StoreBuilder {
 impl StoreBuilder {
     pub fn location<L>(self, location: L) -> Self
     where
-        L: Into<Location>
+        L: Into<Location>,
     {
         Self {
             location: location.into(),
@@ -34,7 +34,7 @@ impl StoreBuilder {
 
     pub fn passphrase_provider<P>(self, passphrase_provider: P) -> Self
     where
-        P: Into<PassphraseProvider>
+        P: Into<PassphraseProvider>,
     {
         Self {
             passphrase_provider: passphrase_provider.into(),
@@ -44,7 +44,7 @@ impl StoreBuilder {
 
     pub fn umask<U>(self, umask: U) -> Self
     where
-        U: Into<Umask>
+        U: Into<Umask>,
     {
         Self {
             umask: umask.into(),
@@ -54,7 +54,7 @@ impl StoreBuilder {
 
     pub fn signing_key<K>(self, signing_key: K) -> Self
     where
-        K: Into<SigningKey>
+        K: Into<SigningKey>,
     {
         Self {
             signing_key: signing_key.into(),
@@ -64,7 +64,7 @@ impl StoreBuilder {
 
     pub fn sorting<S>(self, sorting: S) -> Self
     where
-        S: Into<Sorting>
+        S: Into<Sorting>,
     {
         Self {
             sorting: sorting.into(),

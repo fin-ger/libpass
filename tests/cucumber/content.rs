@@ -1,6 +1,6 @@
 use std::panic::AssertUnwindSafe;
 
-use cucumber_rust::{when, then};
+use cucumber_rust::{then, when};
 use pass::TraversalOrder;
 
 use crate::world::IncrementalWorld;
@@ -67,7 +67,9 @@ fn the_password_stores_directory_contains_a_gpg_id_file(world: &mut IncrementalW
 
 #[then("the password store contains passwords")]
 fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::Successful { store, home } = std::mem::replace(world, IncrementalWorld::Initial) {
+    if let IncrementalWorld::Successful { store, home } =
+        std::mem::replace(world, IncrementalWorld::Initial)
+    {
         let expected = [
             (DIR, "Entertainment"),
             (DIR, "Manufacturers"),
@@ -99,7 +101,10 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
             );
         }
 
-        *world = IncrementalWorld::Successful { store: AssertUnwindSafe(store), home };
+        *world = IncrementalWorld::Successful {
+            store: AssertUnwindSafe(store),
+            home,
+        };
     } else {
         panic!("World state is not Successful!");
     }
@@ -109,18 +114,84 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
 fn a_password_is_opened(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
         let content = store.content();
-        let filter = content.directories().filter(|d| d.name() == "Manufacturers").next();
-        let manufacturers = if let Some(dir) = filter { dir } else {
+        let filter = content
+            .directories()
+            .filter(|d| d.name() == "Manufacturers")
+            .next();
+        let manufacturers = if let Some(dir) = filter {
+            dir
+        } else {
             panic!("Manufacturers directory not found in password store!");
         };
 
-        let filter = manufacturers.passwords().filter(|pw| pw.name() == "StrutCo").next();
-        let strutco = if let Some(pw) = filter { pw } else {
+        let filter = manufacturers
+            .passwords()
+            .filter(|pw| pw.name() == "StrutCo")
+            .next();
+        let strutco = if let Some(pw) = filter {
+            pw
+        } else {
             panic!("Manufacturers/StrutCo password not found in password store!");
         };
 
-        let password = strutco.decrypt().expect("Decrypting Manufacturers/StrutCo failed");
+        let password = strutco
+            .decrypt()
+            .expect("Decrypting Manufacturers/StrutCo failed");
         *world = IncrementalWorld::DecryptedPassword { password };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("an existing password is searched in the password store")]
+fn an_existing_password_is_searched_in_the_password_store(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { store, .. } = world {
+        let found_entries = store
+            .find("strutco")
+            .map(|entry| entry.path().to_owned())
+            .collect::<Vec<_>>();
+        *world = IncrementalWorld::Search { found_entries };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a non-existent password is searched in the password store")]
+fn a_non_existent_password_is_searched_in_the_password_store(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { store, .. } = world {
+        let found_entries = store
+            .find("romulan warbird access codes")
+            .map(|entry| entry.path().to_owned())
+            .collect::<Vec<_>>();
+        *world = IncrementalWorld::Search { found_entries };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("content of an existing password is searched in the password store")]
+fn content_of_an_existing_password_is_searched_in_the_password_store(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { store, .. } = world {
+        let found_passwords = store
+            .grep("pattern")
+            .map(|password| password.decrypt().expect("could not decrypt password"))
+            .collect::<Vec<_>>();
+        *world = IncrementalWorld::Grep { found_passwords };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("content of a non-existing password is searched in the password store")]
+fn content_of_a_non_existing_password_is_searched_in_the_password_store(
+    world: &mut IncrementalWorld,
+) {
+    if let IncrementalWorld::Successful { store, .. } = world {
+        let found_passwords = store
+            .grep("romulan cloaking frequency")
+            .map(|password| password.decrypt().expect("could not decrypt password"))
+            .collect::<Vec<_>>();
+        *world = IncrementalWorld::Grep { found_passwords };
     } else {
         panic!("World state is not Successful!");
     }

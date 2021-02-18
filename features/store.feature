@@ -17,15 +17,6 @@ Feature: General password store operations
     And a password is opened
     Then the passphrase can be read
 
-  Scenario: Using the system agent to unlock passwords on an existing password store
-    Given a password store exists
-    And passwords are stored in the password store
-    And a password store is opened
-    When the password store is successfully opened
-    And the system agent is set to unlock passwords
-    And a password is opened
-    Then the passphrase can be read
-
   Scenario: Searching for a password in the password store succeeds
     Given a password store exists
     And passwords are stored in the password store
