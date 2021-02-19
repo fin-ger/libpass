@@ -2,58 +2,33 @@ use id_tree::{NodeId, Tree};
 
 use std::path::{Path, PathBuf};
 
-use crate::{
-    Directories, DirectoryInserter, Entries, PassNode, PasswordInserter, Passwords, Store,
-};
+use crate::{DirectoryInserter, PassNode, PasswordInserter, Store};
 
-pub struct Directory<'a> {
-    name: &'a str,
-    path: &'a Path,
-    tree: &'a Tree<PassNode>,
+pub struct Directory {
+    name: String,
+    path: PathBuf,
     node_id: NodeId,
 }
 
-impl<'a> Directory<'a> {
-    pub(crate) fn new(
-        name: &'a str,
-        path: &'a Path,
-        tree: &'a Tree<PassNode>,
-        node: NodeId,
-    ) -> Self {
+impl Directory {
+    pub(crate) fn new(name: String, path: PathBuf, node_id: NodeId) -> Self {
         Self {
             name,
             path,
-            tree,
-            node_id: node,
+            node_id,
         }
     }
 
-    pub fn name(&self) -> &'a str {
-        self.name
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub fn path(&self) -> &'a Path {
-        self.path
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     pub(crate) fn node_id(&self) -> &NodeId {
         &self.node_id
-    }
-
-    pub fn passwords(&self) -> Passwords {
-        Passwords::new(self.entries())
-    }
-
-    pub fn directories(&self) -> Directories {
-        Directories::new(self.entries())
-    }
-
-    pub fn entries(&self) -> Entries {
-        let entries = self
-            .tree
-            .children_ids(&self.node_id)
-            .expect("Failed to read directory entries from internal tree");
-        Entries::new(self.tree, entries)
     }
 
     pub fn make_mut(self, store: &mut Store) -> MutDirectory {
@@ -73,13 +48,13 @@ impl<'a> MutDirectory<'a> {
         name: String,
         path: PathBuf,
         tree: &'a mut Tree<PassNode>,
-        node: NodeId,
+        node_id: NodeId,
     ) -> Self {
         Self {
             name,
             path,
             tree,
-            node_id: node,
+            node_id,
         }
     }
 
@@ -101,21 +76,5 @@ impl<'a> MutDirectory<'a> {
 
     pub fn path(&self) -> &Path {
         &self.path
-    }
-
-    pub fn passwords(&self) -> Passwords {
-        Passwords::new(self.entries())
-    }
-
-    pub fn directories(&self) -> Directories {
-        Directories::new(self.entries())
-    }
-
-    pub fn entries(&self) -> Entries {
-        let entries = self
-            .tree
-            .children_ids(&self.node_id)
-            .expect("Failed to read directory entries from internal tree");
-        Entries::new(self.tree, entries)
     }
 }

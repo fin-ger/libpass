@@ -53,7 +53,9 @@ impl<'a> PasswordInserter<'a> {
         Self { entries, ..self }
     }
 
-    pub fn insert(self) -> Result<Password<'a>, InsertionError> {
+    pub fn insert(self) -> Result<Password, InsertionError> {
+        
+
         //self.tree.insert(node, behavior)
         // TODO: insert into Tree<PassNode>
         todo!();
@@ -71,7 +73,7 @@ impl<'a> DirectoryInserter<'a> {
         Self { tree, name, path }
     }
 
-    pub fn insert(self) -> Result<Directory<'a>, InsertionError> {
+    pub fn insert(self) -> Result<Directory, InsertionError> {
         // TODO: insert into Tree<PassNode>
         todo!();
     }

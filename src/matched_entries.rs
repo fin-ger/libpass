@@ -1,18 +1,18 @@
-use crate::{Entry, RecursiveTraversal};
+use crate::{Entries, Entry};
 
 pub struct MatchedEntries<'a, 'b> {
     pattern: &'b str,
-    traverser: RecursiveTraversal<'a>,
+    traverser: Entries<'a>,
 }
 
 impl<'a, 'b> MatchedEntries<'a, 'b> {
-    pub(crate) fn new(pattern: &'b str, traverser: RecursiveTraversal<'a>) -> Self {
+    pub(crate) fn new(pattern: &'b str, traverser: Entries<'a>) -> Self {
         Self { pattern, traverser }
     }
 }
 
 impl<'a, 'b> Iterator for MatchedEntries<'a, 'b> {
-    type Item = Entry<'a>;
+    type Item = Entry;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(next) = self.traverser.next() {

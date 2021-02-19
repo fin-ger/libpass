@@ -9,7 +9,7 @@ use crate::{DIR, PW};
 #[then("the password store is empty")]
 fn the_password_store_is_empty(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
-        let length = store.traverse_recursive(TraversalOrder::LevelOrder).count();
+        let length = store.show(".", TraversalOrder::LevelOrder).unwrap().count();
         if length > 0 {
             panic!(format!(
                 "Store is not empty when it should be! Actual length: {}",
@@ -71,19 +71,20 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
         std::mem::replace(world, IncrementalWorld::Initial)
     {
         let expected = [
-            (DIR, "Entertainment"),
-            (DIR, "Manufacturers"),
-            (PW, "Phone.gpg"),
-            (DIR, "Entertainment/Holo Deck"),
-            (PW, "Manufacturers/Sokor.gpg"),
-            (PW, "Manufacturers/StrutCo.gpg"),
-            (PW, "Manufacturers/Yoyodyne.gpg"),
-            (PW, "Entertainment/Holo Deck/Broht & Forrester.gpg"),
+            (DIR, ("", ".")),
+            (DIR, ("Entertainment", "Entertainment")),
+            (DIR, ("Manufacturers", "Manufacturers")),
+            (PW, ("Phone.gpg", "Phone")),
+            (DIR, ("Entertainment/Holo Deck", "Holo Deck")),
+            (PW, ("Manufacturers/Sokor.gpg", "Sokor")),
+            (PW, ("Manufacturers/StrutCo.gpg", "StrutCo")),
+            (PW, ("Manufacturers/Yoyodyne.gpg", "Yoyodyne")),
+            (PW, ("Entertainment/Holo Deck/Broht & Forrester.gpg", "Broht & Forrester")),
         ];
         let store = store.0;
-        let actual = store.traverse_recursive(TraversalOrder::LevelOrder);
+        let actual = store.show(".", TraversalOrder::LevelOrder).unwrap();
 
-        for (ref entry, (is_dir, expected)) in actual.zip(&expected) {
+        for (ref entry, (is_dir, (expected_path, expected_name))) in actual.zip(&expected) {
             if *is_dir {
                 assert!(
                     entry.is_dir(),
@@ -96,8 +97,12 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
                 );
             }
             assert!(
-                entry.path().ends_with(expected),
-                format!("{} is not {}", entry.path().display(), expected),
+                entry.path().ends_with(expected_path),
+                format!("path {} has no suffix {}", entry.path().display(), expected_path),
+            );
+            assert!(
+                entry.name() == *expected_name,
+                format!("name {} is not {}", entry.name(), expected_name),
             );
         }
 
@@ -113,30 +118,14 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
 #[when("a password is opened")]
 fn a_password_is_opened(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
-        let content = store.content();
-        let filter = content
-            .directories()
-            .filter(|d| d.name() == "Manufacturers")
-            .next();
-        let manufacturers = if let Some(dir) = filter {
-            dir
-        } else {
-            panic!("Manufacturers directory not found in password store!");
-        };
+        let entry = store.show("./Manufacturers/StrutCo.gpg", TraversalOrder::PreOrder).unwrap()
+            .next().expect("Manufacturers/StrutCo password not found in password store!");
 
-        let filter = manufacturers
-            .passwords()
-            .filter(|pw| pw.name() == "StrutCo")
-            .next();
-        let strutco = if let Some(pw) = filter {
-            pw
-        } else {
-            panic!("Manufacturers/StrutCo password not found in password store!");
-        };
-
+        let strutco = entry.password()
+            .expect("Manufacturers/StrutCo is not a password but a directory!");
         let password = strutco
             .decrypt()
-            .expect("Decrypting Manufacturers/StrutCo failed");
+            .expect("Decrypting Manufacturers/StrutCo failed!");
         *world = IncrementalWorld::DecryptedPassword { password };
     } else {
         panic!("World state is not Successful!");

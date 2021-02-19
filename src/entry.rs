@@ -5,26 +5,21 @@ use std::path::Path;
 
 use crate::{Directory, MutDirectory, MutPassword, PassNode, Password, Store};
 
-pub struct Entry<'a> {
-    data: &'a PassNode,
-    tree: &'a Tree<PassNode>,
+pub struct Entry {
+    data: PassNode,
     node_id: NodeId,
 }
 
-impl<'a> Entry<'a> {
-    pub(crate) fn new(node_id: NodeId, tree: &'a Tree<PassNode>) -> Self {
-        Self {
-            data: tree.get(&node_id).unwrap().data(),
-            tree,
-            node_id,
-        }
+impl Entry {
+    pub(crate) fn new(node_id: NodeId, data: PassNode) -> Self {
+        Self { data, node_id }
     }
 
-    pub fn name(&self) -> &'a str {
+    pub fn name(&self) -> &str {
         self.data.name()
     }
 
-    pub fn path(&self) -> &'a Path {
+    pub fn path(&self) -> &Path {
         self.data.path()
     }
 
@@ -40,17 +35,17 @@ impl<'a> Entry<'a> {
         self.data.is_password()
     }
 
-    pub fn password(&self) -> Option<Password<'a>> {
+    pub fn password(self) -> Option<Password> {
         if let PassNode::Password { name, path } = self.data {
-            Some(Password::new(name, path, self.node_id.clone()))
+            Some(Password::new(name, path, self.node_id))
         } else {
             None
         }
     }
 
-    pub fn directory(&self) -> Option<Directory<'a>> {
+    pub fn directory(self) -> Option<Directory> {
         if let PassNode::Directory { name, path } = self.data {
-            Some(Directory::new(name, path, self.tree, self.node_id.clone()))
+            Some(Directory::new(name, path, self.node_id))
         } else {
             None
         }
@@ -61,7 +56,7 @@ impl<'a> Entry<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Entry<'a> {
+impl fmt::Debug for Entry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = if self.is_dir() {
             "Directory"

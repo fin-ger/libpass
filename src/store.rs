@@ -6,8 +6,8 @@ use id_tree::{InsertBehavior, Node, NodeId, Tree};
 use thiserror::Error;
 
 use crate::{
-    Directory, Entry, IntoStoreReadError, Location, MatchedEntries, MatchedPasswords, MutDirectory,
-    MutEntry, MutPassword, PassNode, PassphraseProvider, Password, RecursiveTraversal, SigningKey,
+    Directory, Entries, Entry, IntoStoreReadError, Location, MatchedEntries, MatchedPasswords,
+    MutDirectory, MutEntry, MutPassword, PassNode, PassphraseProvider, Password, SigningKey,
     Sorting, StoreReadError, TraversalOrder, Umask,
 };
 
@@ -41,6 +41,10 @@ pub enum StoreError {
     EnvVar(#[source] env::VarError),
     #[error("Cannot find home directory for current user")]
     NoHome(#[source] Box<StoreError>),
+    #[error("Given path is not contained in the password store: {0}")]
+    NotInStore(PathBuf),
+    #[error("Given path does not exist: {0}")]
+    DoesNotExist(#[source] std::io::Error),
 }
 
 trait IntoStoreError<T> {
@@ -101,6 +105,10 @@ impl Store {
                         .with_store_error()
                 })?,
             Location::Manual(path) => path,
+        };
+        let path = match path.canonicalize() {
+            Ok(path) => path,
+            Err(err) => return Err(StoreError::Io(err)),
         };
 
         let metadata = path.metadata().with_store_error()?;
@@ -242,20 +250,90 @@ impl Store {
     }
 
     pub fn find<'a, 'b>(&'a self, pattern: &'b str) -> MatchedEntries<'a, 'b> {
-        MatchedEntries::new(pattern, self.traverse_recursive(TraversalOrder::PreOrder))
+        MatchedEntries::new(
+            pattern,
+            self.show(".", TraversalOrder::PreOrder)
+                .expect("Root node of internal tree could not be found"),
+        )
     }
 
     pub fn grep<'a, 'b>(&'a self, pattern: &'b str) -> MatchedPasswords<'a, 'b> {
-        MatchedPasswords::new(pattern, self.traverse_recursive(TraversalOrder::PostOrder))
+        MatchedPasswords::new(
+            pattern,
+            self.show(".", TraversalOrder::PostOrder)
+                .expect("Root node of internal tree could not be found"),
+        )
     }
 
-    pub fn content(&self) -> Directory {
-        let root_id = self
-            .tree
-            .root_node_id()
-            .expect("Failed to get root node of internal tree")
-            .clone();
-        Directory::new(".", &self.path, &self.tree, root_id)
+    /// Either a relative path from the store's root or an absolute path where the
+    /// password store's location is a prefix of the path.
+    ///
+    /// Example:
+    ///
+    /// "/path/to/password/store/and/password.gpg" for an absolute path where the password store is located at "/path/to/password/store"
+    ///
+    /// "./and/password.gpg" for a relative path inside the password store
+    pub fn show<P: AsRef<Path>>(
+        &self,
+        path: P,
+        order: TraversalOrder,
+    ) -> Result<Entries, StoreError> {
+        let mut path = path.as_ref().to_owned();
+        if path.is_relative() {
+            path = self.path.join(path);
+        } else if path.strip_prefix(&self.path).is_err() {
+            return Err(StoreError::NotInStore(path));
+        }
+
+        let path = match path.canonicalize() {
+            Ok(path) => path,
+            Err(err) => return Err(StoreError::DoesNotExist(err)),
+        };
+
+        let mut id = self.tree.root_node_id();
+        if let Some(node_id) = id {
+            let root_path = self
+                .tree
+                .get(node_id)
+                .expect("Root node not available in internal tree")
+                .data()
+                .path();
+            if path == root_path {
+                return Ok(Entries::new(&self.tree, node_id, order));
+            }
+        }
+
+        'search: while let Some(node_id) = id {
+            id = None;
+            let children_ids = self
+                .tree
+                .children_ids(node_id)
+                .expect("Failed to get children of path node in internal tree");
+            'children: for child_id in children_ids {
+                let node_path = self
+                    .tree
+                    .get(child_id)
+                    .expect("Failed to get data of node in internal tree")
+                    .data()
+                    .path();
+                if path == node_path {
+                    // complete path found
+                    id = Some(child_id);
+                    break 'search;
+                } else if path.starts_with(node_path) {
+                    // next level in path found
+                    id = Some(child_id);
+                    break 'children;
+                }
+            }
+        }
+
+        // This should never fail as path has been checked for canonicalization
+        // which ensures the path exists on the filesystem.
+        let node_id =
+            id.expect("Store entry not found in password store although it must be available!");
+
+        Ok(Entries::new(&self.tree, node_id, order))
     }
 
     pub fn mut_directory(&mut self, directory: Directory) -> MutDirectory {
@@ -278,10 +356,6 @@ impl Store {
 
     pub fn mut_entry(&mut self, entry: Entry) -> MutEntry {
         MutEntry::new(entry.node_id().to_owned(), &mut self.tree)
-    }
-
-    pub fn traverse_recursive<'a>(&'a self, order: TraversalOrder) -> RecursiveTraversal<'a> {
-        RecursiveTraversal::new(&self.tree, order)
     }
 
     pub fn location(&self) -> &Path {

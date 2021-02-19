@@ -75,44 +75,44 @@ impl DecryptedPassword {
         })
     }
 
-    pub fn passphrase<'a>(&'a self) -> &'a str {
+    pub fn passphrase(&self) -> &str {
         &self.passphrase
     }
 
-    pub fn comments<'a>(&'a self) -> &'a Vec<String> {
+    pub fn comments(&self) -> &Vec<String> {
         &self.comments
     }
 
-    pub fn entry<'a>(&'a self, key: &str) -> Option<&'a String> {
+    pub fn entry(&self, key: &str) -> Option<&String> {
         self.entries.get(key)
     }
 
-    pub fn all_entries<'a>(&'a self) -> &'a HashMap<String, String> {
+    pub fn all_entries(&self) -> &HashMap<String, String> {
         &self.entries
     }
 }
 
-pub struct Password<'a> {
-    name: &'a str,
-    path: &'a Path,
+pub struct Password {
+    name: String,
+    path: PathBuf,
     node_id: NodeId,
 }
 
-impl<'a> Password<'a> {
-    pub(crate) fn new(name: &'a str, path: &'a Path, node: NodeId) -> Self {
+impl Password {
+    pub(crate) fn new(name: String, path: PathBuf, node_id: NodeId) -> Self {
         Self {
             name,
             path,
-            node_id: node,
+            node_id,
         }
     }
 
-    pub fn name(&self) -> &'a str {
-        self.name
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub fn path(&self) -> &'a Path {
-        self.path
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     pub(crate) fn node_id(&self) -> &NodeId {
@@ -120,7 +120,7 @@ impl<'a> Password<'a> {
     }
 
     pub fn decrypt(&self) -> Result<DecryptedPassword, StoreReadError> {
-        DecryptedPassword::new(self.path)
+        DecryptedPassword::new(&self.path)
     }
 
     pub fn make_mut(self, store: &mut Store) -> MutPassword {
