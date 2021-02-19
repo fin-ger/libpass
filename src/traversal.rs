@@ -1,5 +1,3 @@
-use std::iter::Skip;
-
 use id_tree::{LevelOrderTraversalIds, NodeId, PostOrderTraversalIds, PreOrderTraversalIds, Tree};
 
 use crate::{Entry, PassNode};

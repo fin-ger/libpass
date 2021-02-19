@@ -1,7 +1,6 @@
 mod builder;
 mod directory;
 mod entry;
-mod entry_path;
 mod git;
 mod inserter;
 mod matched_entries;
@@ -14,7 +13,6 @@ mod traversal;
 pub use builder::*;
 pub use directory::*;
 pub use entry::*;
-pub use entry_path::*;
 pub use git::*;
 pub use inserter::*;
 pub use matched_entries::*;
