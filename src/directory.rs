@@ -61,7 +61,7 @@ impl<'a> MutDirectory<'a> {
     pub fn password_insertion<N: Into<String>>(&mut self, name: N) -> PasswordInserter {
         let name = name.into();
         let path = self.path.join(&name);
-        PasswordInserter::new(self.tree, path, name)
+        PasswordInserter::new(self.tree, self.node_id.clone(), path, name)
     }
 
     pub fn directory_insertion<N: Into<String>>(&mut self, name: N) -> DirectoryInserter {

@@ -33,7 +33,7 @@ impl<'a> Iterator for StoreReadErrors<'a> {
 
 #[derive(Error, Debug)]
 pub enum StoreError {
-    #[error("Could not open password store")]
+    #[error("Could not open or modify entries in password store")]
     Io(#[source] io::Error),
     #[error("Password store path is not a directory: {0}")]
     NoDirectory(PathBuf),
@@ -44,10 +44,10 @@ pub enum StoreError {
     #[error("Given path is not contained in the password store: {0}")]
     NotInStore(PathBuf),
     #[error("Given path does not exist: {0}")]
-    DoesNotExist(#[source] std::io::Error),
+    DoesNotExist(#[source] io::Error),
 }
 
-trait IntoStoreError<T> {
+pub(crate) trait IntoStoreError<T> {
     fn with_store_error(self: Self) -> Result<T, StoreError>;
 }
 

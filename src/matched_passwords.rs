@@ -23,12 +23,12 @@ impl<'a, 'b> Iterator for MatchedPasswords<'a, 'b> {
                         .to_lowercase()
                         .find(&self.pattern.to_lowercase())
                         .is_some()
-                        || decrypted.comments().into_iter().any(|c| {
+                        || decrypted.comments().any(|(_pos, c)| {
                             c.to_lowercase()
                                 .find(&self.pattern.to_lowercase())
                                 .is_some()
                         })
-                        || decrypted.all_entries().iter().any(|(k, v)| {
+                        || decrypted.all_entries().any(|(k, (_pos, v))| {
                             k.to_lowercase()
                                 .find(&self.pattern.to_lowercase())
                                 .is_some()
