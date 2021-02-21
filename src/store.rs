@@ -70,35 +70,8 @@ impl Store {
         Ok(me)
     }
 
-    pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-
-    pub fn errors(&self) -> StoreErrors {
-        StoreErrors::new(&self.errors)
-    }
-
-    pub fn sort(&mut self, sorting: Sorting) {
-        if sorting.contains(Sorting::NONE) {
-            return;
-        }
-
-        let root_id = self
-            .tree
-            .root_node_id()
-            .expect("Cannot find root node in internal tree")
-            .clone();
-        let level_order = self
-            .tree
-            .traverse_level_order_ids(&root_id)
-            .expect("Failed to traverse internal tree")
-            .collect::<Vec<_>>();
-
-        for node_id in level_order {
-            self.tree
-                .sort_children_by(&node_id, |a, b| sorting.cmp(a, b))
-                .expect("Failed to sort internal tree");
-        }
+    pub(crate) fn tree(&self) -> &Tree<PassNode> {
+        &self.tree
     }
 
     fn load_passwords(&mut self) {
@@ -193,6 +166,37 @@ impl Store {
         }
 
         self.errors.extend(errors);
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn errors(&self) -> StoreErrors {
+        StoreErrors::new(&self.errors)
+    }
+
+    pub fn sort(&mut self, sorting: Sorting) {
+        if sorting.contains(Sorting::NONE) {
+            return;
+        }
+
+        let root_id = self
+            .tree
+            .root_node_id()
+            .expect("Cannot find root node in internal tree")
+            .clone();
+        let level_order = self
+            .tree
+            .traverse_level_order_ids(&root_id)
+            .expect("Failed to traverse internal tree")
+            .collect::<Vec<_>>();
+
+        for node_id in level_order {
+            self.tree
+                .sort_children_by(&node_id, |a, b| sorting.cmp(a, b))
+                .expect("Failed to sort internal tree");
+        }
     }
 
     pub fn find<'a, 'b>(&'a self, pattern: &'b str) -> MatchedEntries<'a, 'b> {

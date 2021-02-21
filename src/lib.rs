@@ -12,6 +12,9 @@ mod password;
 mod store;
 mod traversal;
 
+#[cfg(feature = "passphrase-utils")]
+pub mod passphrase_utils;
+
 #[cfg(feature = "parsed-passwords")]
 pub mod parsed;
 

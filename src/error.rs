@@ -37,7 +37,11 @@ pub enum StoreError {
     #[error("Failed to decrypt password {0}")]
     Decrypt(String, #[source] gpgme::Error),
     #[error("Failed to parse password content for {0}")]
-    Parse(String, #[source] Box<dyn std::error::Error>),
+    Parse(String, #[source] Box<dyn std::error::Error + Send + Sync>),
+    #[error("Invalid passphrase index {0}")]
+    PassphraseIndex(usize),
+    #[error("Generating passphrase failed: {0}")]
+    PassphraseGeneration(&'static str),
 }
 
 pub(crate) trait IntoStoreError<T> {

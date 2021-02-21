@@ -26,7 +26,10 @@ impl Directory {
     }
 
     #[cfg(feature = "parsed-passwords")]
-    pub fn parsed_password_insertion<N: Into<String>>(&mut self, name: N) -> crate::parsed::PasswordInserter {
+    pub fn parsed_password_insertion<N: Into<String>>(
+        &mut self,
+        name: N,
+    ) -> crate::parsed::PasswordInserter {
         let name = name.into();
         let path = self.path.join(&name);
         crate::parsed::PasswordInserter::new(self.node_id.clone(), path, name)
@@ -46,6 +49,17 @@ impl Directory {
         &self.path
     }
 
+    pub fn parent(&self, store: &Store) -> Option<Directory> {
+        let parent_id = store.tree().ancestor_ids(&self.node_id).ok()?.next()?;
+        let parent = store.tree().get(&parent_id).ok()?;
+
+        Some(Directory::new(
+            parent.data().name().to_owned(),
+            parent.data().path().to_owned(),
+            parent_id.clone(),
+        ))
+    }
+
     pub(crate) fn node_id(&self) -> &NodeId {
         &self.node_id
     }
@@ -53,6 +67,11 @@ impl Directory {
     pub fn make_mut(self, store: &mut Store) -> MutDirectory {
         store.mut_directory(self)
     }
+}
+
+pub enum OpMode {
+    Default,
+    Recursive,
 }
 
 pub struct MutDirectory<'a> {
@@ -84,4 +103,25 @@ impl<'a> MutDirectory<'a> {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    pub fn parent(&self) -> Option<Directory> {
+        let parent_id = self.tree.ancestor_ids(&self.node_id).ok()?.next()?;
+        let parent = self.tree.get(&parent_id).ok()?;
+
+        Some(Directory::new(
+            parent.data().name().to_owned(),
+            parent.data().path().to_owned(),
+            parent_id.clone(),
+        ))
+    }
+
+    pub fn remove(self, _op_mode: OpMode) {
+        
+    }
+
+    pub fn rename<N: Into<String>>(&mut self, _name: N) {}
+
+    pub fn move_to(&mut self, _directory: &Directory) {}
+
+    pub fn copy_to(&mut self, _directory: &Directory) {}
 }

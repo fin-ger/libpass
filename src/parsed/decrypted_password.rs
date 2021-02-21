@@ -1,5 +1,6 @@
 use pest::Parser;
 use pest_derive::Parser;
+use gpgme::{Context, Protocol};
 use std::{
     collections::HashMap,
     fmt,
@@ -8,7 +9,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{IntoStoreError, Position, StoreError};
+use crate::{search_gpg_ids, IntoStoreError, Position, StoreError};
+
+#[cfg(feature = "passphrase-utils")]
+use crate::passphrase_utils::{AnalyzedPassphrase, PassphraseGenerator};
 
 #[derive(Parser, Debug)]
 #[grammar = "parsed/pass.pest"]
@@ -117,9 +121,29 @@ impl DecryptedPassword {
             .truncate(true)
             .open(&self.path)
             .with_store_error(self.path.display().to_string())?;
-        f.write_all(format!("{}", self).as_bytes())
+        let mut ctx = Context::from_protocol(Protocol::OpenPgp)
+            .with_store_error(self.path.display().to_string())?;
+        let content = format!("{}", self);
+        let mut encrypted = Vec::new();
+        let gpg_ids = search_gpg_ids(&self.path, &mut ctx);
+        ctx.encrypt(gpg_ids.iter(), content, &mut encrypted)
+            .with_store_error(self.path.display().to_string())?;
+
+        f.write_all(&encrypted)
             .with_store_error(self.path.display().to_string())?;
         f.flush().with_store_error(self.path.display().to_string())
+    }
+
+    #[cfg(feature = "passphrase-utils")]
+    pub fn generator(&mut self) -> PassphraseGenerator {
+        PassphraseGenerator::new(move |passphrase| self.set_passphrase(passphrase))
+    }
+
+    #[cfg(feature = "passphrase-utils")]
+    pub fn analyze_passphrase(&self) -> Option<AnalyzedPassphrase> {
+        let passphrase = self.passphrase()?;
+
+        Some(AnalyzedPassphrase::new(passphrase))
     }
 
     pub fn passphrase(&self) -> Option<&str> {

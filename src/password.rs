@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use id_tree::{NodeId, Tree};
 
-use crate::{DecryptedPassword, PassNode, Store, StoreError};
+use crate::{DecryptedPassword, Directory, PassNode, Store, StoreError};
 
 pub struct Password {
     name: String,
@@ -26,6 +26,25 @@ impl Password {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub fn parent(&self, store: &Store) -> Directory {
+        let parent_id = store
+            .tree()
+            .ancestor_ids(&self.node_id)
+            .expect("Password node does not exist in internal tree")
+            .next()
+            .expect("Password has no parents");
+        let parent = store
+            .tree()
+            .get(&parent_id)
+            .expect("Parent of password does not exist in internal tree");
+
+        Directory::new(
+            parent.data().name().to_owned(),
+            parent.data().path().to_owned(),
+            parent_id.clone(),
+        )
     }
 
     pub(crate) fn node_id(&self) -> &NodeId {
@@ -70,6 +89,33 @@ impl<'a> MutPassword<'a> {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    pub fn parent(&self) -> Directory {
+        let parent_id = self
+            .tree
+            .ancestor_ids(&self.node_id)
+            .expect("Password node does not exist in internal tree")
+            .next()
+            .expect("Password has no parents");
+        let parent = self
+            .tree
+            .get(&parent_id)
+            .expect("Parent of password does not exist in internal tree");
+
+        Directory::new(
+            parent.data().name().to_owned(),
+            parent.data().path().to_owned(),
+            parent_id.clone(),
+        )
+    }
+
+    pub fn remove(self) {}
+
+    pub fn rename<N: Into<String>>(&mut self, _name: N) {}
+
+    pub fn move_to(&mut self, _directory: &Directory) {}
+
+    pub fn copy_to(&mut self, _directory: &Directory) {}
 
     pub fn decrypt(&self) -> Result<DecryptedPassword, StoreError> {
         DecryptedPassword::from_path(&self.path)

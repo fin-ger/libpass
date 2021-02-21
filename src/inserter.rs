@@ -50,8 +50,8 @@ impl PasswordInserter {
 }
 
 pub struct DirectoryInserter {
-    path: PathBuf,
-    name: String,
+    pub path: PathBuf,
+    pub name: String,
 }
 
 impl DirectoryInserter {
