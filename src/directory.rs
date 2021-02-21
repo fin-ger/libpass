@@ -19,6 +19,25 @@ impl Directory {
         }
     }
 
+    pub fn password_insertion<N: Into<String>>(&mut self, name: N) -> PasswordInserter {
+        let name = name.into();
+        let path = self.path.join(&name);
+        PasswordInserter::new(self.node_id.clone(), path, name)
+    }
+
+    #[cfg(feature = "parsed-passwords")]
+    pub fn parsed_password_insertion<N: Into<String>>(&mut self, name: N) -> crate::parsed::PasswordInserter {
+        let name = name.into();
+        let path = self.path.join(&name);
+        crate::parsed::PasswordInserter::new(self.node_id.clone(), path, name)
+    }
+
+    pub fn directory_insertion<N: Into<String>>(&mut self, name: N) -> DirectoryInserter {
+        let name = name.into();
+        let path = self.path.join(&name);
+        DirectoryInserter::new(path, name)
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -56,18 +75,6 @@ impl<'a> MutDirectory<'a> {
             tree,
             node_id,
         }
-    }
-
-    pub fn password_insertion<N: Into<String>>(&mut self, name: N) -> PasswordInserter {
-        let name = name.into();
-        let path = self.path.join(&name);
-        PasswordInserter::new(self.tree, self.node_id.clone(), path, name)
-    }
-
-    pub fn directory_insertion<N: Into<String>>(&mut self, name: N) -> DirectoryInserter {
-        let name = name.into();
-        let path = self.path.join(&name);
-        DirectoryInserter::new(self.tree, path, name)
     }
 
     pub fn name(&self) -> &str {

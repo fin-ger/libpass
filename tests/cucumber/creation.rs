@@ -15,13 +15,10 @@ fn a_password_provider_is_available(world: &mut IncrementalWorld) {
         ..
     } = world
     {
-        *builder =
-            builder
-                .clone()
-                .passphrase_provider(|_req: PassphraseRequest, w: &mut dyn Write| {
-                    w.write_all(b"test1234\n").unwrap();
-                    Ok(())
-                });
+        builder.passphrase_provider(|_req: PassphraseRequest, w: &mut dyn Write| {
+            w.write_all(b"test1234\n").unwrap();
+            Ok(())
+        });
     } else {
         panic!("World state is not Prepared!");
     }
@@ -34,9 +31,7 @@ fn the_system_agent_is_used_to_unlock_passwords(world: &mut IncrementalWorld) {
         ..
     } = world
     {
-        *builder = builder
-            .clone()
-            .passphrase_provider(PassphraseProvider::SystemAgent);
+        builder.passphrase_provider(PassphraseProvider::SystemAgent);
     } else {
         panic!("World state is not Prepared!");
     }
@@ -49,7 +44,7 @@ fn the_password_store_umask_is_automatically_detected(world: &mut IncrementalWor
         ..
     } = world
     {
-        *builder = builder.clone().umask(Umask::Automatic);
+        builder.umask(Umask::Automatic);
     }
 }
 
@@ -60,7 +55,7 @@ fn the_password_store_umask_is_manually_set_to_027(world: &mut IncrementalWorld)
         ..
     } = world
     {
-        *builder = builder.clone().umask(0o027 as u32);
+        builder.umask(0o027 as u32);
     } else {
         panic!("World state is not Prepared!");
     }
@@ -73,7 +68,7 @@ fn a_signing_key_is_manually_specified(world: &mut IncrementalWorld) {
         ..
     } = world
     {
-        *builder = builder.clone().signing_key("test@key.email");
+        builder.signing_key("test@key.email");
     } else {
         panic!("World state is not Prepared!");
     }
@@ -86,7 +81,7 @@ fn automatic_signing_key_detection_is_used(world: &mut IncrementalWorld) {
         ..
     } = world
     {
-        *builder = builder.clone().signing_key(SigningKey::Automatic);
+        builder.signing_key(SigningKey::Automatic);
     } else {
         panic!("World state is not Prepared!");
     }
@@ -99,9 +94,7 @@ fn the_passwords_in_the_store_are_sorted(world: &mut IncrementalWorld) {
         ..
     } = world
     {
-        *builder = builder
-            .clone()
-            .sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
+        builder.sorting(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
     } else {
         panic!("World state is not Prepared!");
     }

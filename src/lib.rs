@@ -1,6 +1,8 @@
 mod builder;
+mod decrypted_password;
 mod directory;
 mod entry;
+mod error;
 mod git;
 mod inserter;
 mod matched_entries;
@@ -10,9 +12,14 @@ mod password;
 mod store;
 mod traversal;
 
+#[cfg(feature = "parsed-passwords")]
+pub mod parsed;
+
 pub use builder::*;
+pub use decrypted_password::*;
 pub use directory::*;
 pub use entry::*;
+pub use error::*;
 pub use git::*;
 pub use inserter::*;
 pub use matched_entries::*;

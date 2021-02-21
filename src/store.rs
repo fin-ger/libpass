@@ -1,78 +1,20 @@
 use std::path::PathBuf;
-use std::{env, fs, io, path::Path};
+use std::{env, fs, path::Path};
 
 use directories::BaseDirs;
 use id_tree::{InsertBehavior, Node, NodeId, Tree};
-use thiserror::Error;
 
 use crate::{
-    Directory, Entries, Entry, IntoStoreReadError, Location, MatchedEntries, MatchedPasswords,
-    MutDirectory, MutEntry, MutPassword, PassNode, PassphraseProvider, Password, SigningKey,
-    Sorting, StoreReadError, TraversalOrder, Umask,
+    DecryptedPassword, Directory, DirectoryInserter, Entries, Entry, IntoStoreError, Location,
+    MatchedEntries, MatchedPasswords, MutDirectory, MutEntry, MutPassword, PassNode,
+    PassphraseProvider, Password, PasswordInserter, SigningKey, Sorting, StoreError, StoreErrors,
+    TraversalOrder, Umask,
 };
-
-pub struct StoreReadErrors<'a> {
-    iter: std::slice::Iter<'a, StoreReadError>,
-}
-
-impl<'a> StoreReadErrors<'a> {
-    fn new(errors: &'a Vec<StoreReadError>) -> Self {
-        Self {
-            iter: errors.into_iter(),
-        }
-    }
-}
-
-impl<'a> Iterator for StoreReadErrors<'a> {
-    type Item = &'a StoreReadError;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum StoreError {
-    #[error("Could not open or modify entries in password store")]
-    Io(#[source] io::Error),
-    #[error("Password store path is not a directory: {0}")]
-    NoDirectory(PathBuf),
-    #[error("PASSWORD_STORE_DIR environment variable is not set")]
-    EnvVar(#[source] env::VarError),
-    #[error("Cannot find home directory for current user")]
-    NoHome(#[source] Box<StoreError>),
-    #[error("Given path is not contained in the password store: {0}")]
-    NotInStore(PathBuf),
-    #[error("Given path does not exist: {0}")]
-    DoesNotExist(#[source] io::Error),
-}
-
-pub(crate) trait IntoStoreError<T> {
-    fn with_store_error(self: Self) -> Result<T, StoreError>;
-}
-
-impl<T> IntoStoreError<T> for Result<T, env::VarError> {
-    fn with_store_error(self: Self) -> Result<T, StoreError> {
-        self.map_err(|err| StoreError::EnvVar(err))
-    }
-}
-
-impl<T> IntoStoreError<T> for Result<T, StoreError> {
-    fn with_store_error(self: Self) -> Result<T, StoreError> {
-        self.map_err(|err| StoreError::NoHome(Box::new(err)))
-    }
-}
-
-impl<T> IntoStoreError<T> for Result<T, io::Error> {
-    fn with_store_error(self: Self) -> Result<T, StoreError> {
-        self.map_err(|err| StoreError::Io(err))
-    }
-}
 
 pub struct Store {
     path: PathBuf,
     tree: Tree<PassNode>,
-    errors: Vec<StoreReadError>,
+    errors: Vec<StoreError>,
 }
 
 impl Store {
@@ -96,22 +38,22 @@ impl Store {
     ) -> Result<Self, StoreError> {
         let path = match location {
             Location::Automatic => env::var("PASSWORD_STORE_DIR")
-                .with_store_error()
+                .with_store_error("PASSWORD_STORE_DIR")
                 .map(|password_store_dir| Path::new(&password_store_dir).to_owned())
                 .or_else(|e| {
                     BaseDirs::new()
                         .map(|base_dirs| base_dirs.home_dir().join(".password-store"))
                         .ok_or(e)
-                        .with_store_error()
+                        .with_store_error("attempted search in default paths")
                 })?,
             Location::Manual(path) => path,
         };
-        let path = match path.canonicalize() {
-            Ok(path) => path,
-            Err(err) => return Err(StoreError::Io(err)),
-        };
-
-        let metadata = path.metadata().with_store_error()?;
+        let path = path
+            .canonicalize()
+            .with_store_error(path.display().to_string())?;
+        let metadata = path
+            .metadata()
+            .with_store_error(path.display().to_string())?;
         if !metadata.is_dir() {
             return Err(StoreError::NoDirectory(path));
         }
@@ -132,8 +74,8 @@ impl Store {
         !self.errors.is_empty()
     }
 
-    pub fn errors(&self) -> StoreReadErrors {
-        StoreReadErrors::new(&self.errors)
+    pub fn errors(&self) -> StoreErrors {
+        StoreErrors::new(&self.errors)
     }
 
     pub fn sort(&mut self, sorting: Sorting) {
@@ -188,7 +130,8 @@ impl Store {
     }
 
     fn load_passwords_from_dir(&mut self, dir: &Path, parent: &NodeId) {
-        let (read_dir, mut errors) = match fs::read_dir(dir).with_store_read_error(dir) {
+        let (read_dir, errors) = match fs::read_dir(dir).with_store_error(dir.display().to_string())
+        {
             Ok(read_dir) => {
                 let (mut read_dir_res, mut errors_res): (Vec<_>, Vec<_>) =
                     read_dir.partition(Result::is_ok);
@@ -196,7 +139,7 @@ impl Store {
                     read_dir_res.drain(..).map(|res| res.unwrap()).collect(),
                     errors_res
                         .drain(..)
-                        .map(|res| res.with_store_read_error(dir).unwrap_err())
+                        .map(|res| res.with_store_error(dir.display().to_string()).unwrap_err())
                         .collect(),
                 )
             }
@@ -222,7 +165,7 @@ impl Store {
                         self.load_passwords_from_dir(&path, &subdir);
                     }
                     None => {
-                        errors.push(StoreReadError::name_error(&path));
+                        // this only triggers when the path is ".." and can therefore be ignored
                     }
                 }
             } else if !Self::is_special_entry(&path) {
@@ -240,7 +183,10 @@ impl Store {
                             .expect("Failed to insert password into internal tree");
                     }
                     None => {
-                        errors.push(StoreReadError::name_error(&path));
+                        // this only triggers when the path is "..":
+                        //   if the filename has not stem (no dot) then the whole filename is used
+                        //   if the filename start with a dot then the whole filename is used
+                        //  therefore this can be ignored.
                     }
                 }
             }
@@ -285,10 +231,9 @@ impl Store {
             return Err(StoreError::NotInStore(path));
         }
 
-        let path = match path.canonicalize() {
-            Ok(path) => path,
-            Err(err) => return Err(StoreError::DoesNotExist(err)),
-        };
+        let path = path
+            .canonicalize()
+            .with_store_error(path.display().to_string())?;
 
         let mut id = self.tree.root_node_id();
         if let Some(node_id) = id {
@@ -356,6 +301,61 @@ impl Store {
 
     pub fn mut_entry(&mut self, entry: Entry) -> MutEntry {
         MutEntry::new(entry.node_id().to_owned(), &mut self.tree)
+    }
+
+    fn insert_password_into_tree(
+        &mut self,
+        name: String,
+        path: PathBuf,
+        parent: &NodeId,
+    ) -> Password {
+        let node = Node::new(PassNode::Password {
+            name: name.clone(),
+            path: path.clone(),
+        });
+        let node_id = self
+            .tree
+            .insert(node, InsertBehavior::UnderNode(parent))
+            .expect("Parent of inserted password does not exist in internal tree");
+
+        Password::new(name, path, node_id)
+    }
+
+    pub fn insert_password(&mut self, inserter: &PasswordInserter) -> Result<Password, StoreError> {
+        DecryptedPassword::create_and_write(inserter.lines.clone(), &self.path)?;
+
+        Ok(self.insert_password_into_tree(
+            inserter.name.clone(),
+            inserter.path.clone(),
+            &inserter.parent,
+        ))
+    }
+
+    #[cfg(feature = "parsed-passwords")]
+    pub fn insert_parsed_password(
+        &mut self,
+        inserter: &crate::parsed::PasswordInserter,
+    ) -> Result<Password, StoreError> {
+        crate::parsed::DecryptedPassword::create_and_write(
+            inserter.passphrase.clone(),
+            inserter.comments.clone(),
+            inserter.entries.clone(),
+            inserter.back,
+            &inserter.path,
+        )?;
+
+        Ok(self.insert_password_into_tree(
+            inserter.name.clone(),
+            inserter.path.clone(),
+            &inserter.parent,
+        ))
+    }
+
+    pub fn insert_directory(
+        &mut self,
+        _inserter: &DirectoryInserter,
+    ) -> Result<Directory, StoreError> {
+        todo!();
     }
 
     pub fn location(&self) -> &Path {

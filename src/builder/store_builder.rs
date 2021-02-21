@@ -22,73 +22,63 @@ impl Default for StoreBuilder {
 }
 
 impl StoreBuilder {
-    pub fn location<L>(self, location: L) -> Self
+    pub fn location<L>(&mut self, location: L) -> &mut Self
     where
         L: Into<Location>,
     {
-        Self {
-            location: location.into(),
-            ..self
-        }
+        self.location = location.into();
+        self
     }
 
-    pub fn passphrase_provider<P>(self, passphrase_provider: P) -> Self
+    pub fn passphrase_provider<P>(&mut self, passphrase_provider: P) -> &mut Self
     where
         P: Into<PassphraseProvider>,
     {
-        Self {
-            passphrase_provider: passphrase_provider.into(),
-            ..self
-        }
+        self.passphrase_provider = passphrase_provider.into();
+        self
     }
 
-    pub fn umask<U>(self, umask: U) -> Self
+    pub fn umask<U>(&mut self, umask: U) -> &mut Self
     where
         U: Into<Umask>,
     {
-        Self {
-            umask: umask.into(),
-            ..self
-        }
+        self.umask = umask.into();
+        self
     }
 
-    pub fn signing_key<K>(self, signing_key: K) -> Self
+    pub fn signing_key<K>(&mut self, signing_key: K) -> &mut Self
     where
         K: Into<SigningKey>,
     {
-        Self {
-            signing_key: signing_key.into(),
-            ..self
-        }
+        self.signing_key = signing_key.into();
+        self
     }
 
-    pub fn sorting<S>(self, sorting: S) -> Self
+    pub fn sorting<S>(&mut self, sorting: S) -> &mut Self
     where
         S: Into<Sorting>,
     {
-        Self {
-            sorting: sorting.into(),
-            ..self
-        }
+        self.sorting = sorting.into();
+        self
     }
 
-    pub fn init(self, gpg_id: &str) -> Result<Store, StoreError> {
+    pub fn init(&self, gpg_id: &str) -> Result<Store, StoreError> {
         Store::init(
-            self.location,
-            self.passphrase_provider,
-            self.umask,
-            self.signing_key,
+            self.location.clone(),
+            self.passphrase_provider.clone(),
+            self.umask.clone(),
+            self.signing_key.clone(),
             self.sorting,
             gpg_id,
         )
     }
 
-    pub fn open(self) -> Result<Store, StoreError> {
+    pub fn open(&self) -> Result<Store, StoreError> {
         Store::open(
-            self.location,
-            self.passphrase_provider,
-            self.umask,
-            self.signing_key,
+            self.location.clone(),
+            self.passphrase_provider.clone(),
+            self.umask.clone(),
+            self.signing_key.clone(),
             self.sorting,
         )
     }
