@@ -49,6 +49,10 @@ impl Directory {
         &self.path
     }
 
+    /*pub fn gpg_ids(&self) -> impl Iterator<Item = &str> {
+        todo!();
+    }*/
+
     pub fn parent(&self, store: &Store) -> Option<Directory> {
         let parent_id = store.tree().ancestor_ids(&self.node_id).ok()?.next()?;
         let parent = store.tree().get(&parent_id).ok()?;
@@ -104,6 +108,26 @@ impl<'a> MutDirectory<'a> {
         &self.path
     }
 
+    /*pub fn gpg_ids(&self) -> impl Iterator<Item = &str> {
+        todo!();
+    }*/
+
+    pub fn add_gpg_id(&self, gpg_id: &str) {
+        todo!();
+    }
+
+    pub fn remove_gpg_id(&self, gpg_id: &str) {
+        todo!();
+    }
+
+    pub fn clear_gpg_ids(&self, gpg_id: &str) {
+        todo!();
+    }
+
+    pub fn set_gpg_ids(&self, gpg_ids: Vec<&str>) {
+        todo!();
+    }
+
     pub fn parent(&self) -> Option<Directory> {
         let parent_id = self.tree.ancestor_ids(&self.node_id).ok()?.next()?;
         let parent = self.tree.get(&parent_id).ok()?;
@@ -116,12 +140,18 @@ impl<'a> MutDirectory<'a> {
     }
 
     pub fn remove(self, _op_mode: OpMode) {
-        
+        todo!();
     }
 
-    pub fn rename<N: Into<String>>(&mut self, _name: N) {}
+    pub fn rename<N: Into<String>>(&mut self, _name: N) {
+        todo!();
+    }
 
-    pub fn move_to(&mut self, _directory: &Directory) {}
+    pub fn move_to(&mut self, _directory: &Directory) {
+        todo!();
+    }
 
-    pub fn copy_to(&mut self, _directory: &Directory) {}
+    pub fn copy_to(&mut self, _directory: &Directory) {
+        todo!();
+    }
 }

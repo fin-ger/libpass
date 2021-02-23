@@ -2,6 +2,9 @@ use std::{env, io, path::PathBuf};
 
 use thiserror::Error;
 
+#[cfg(feature = "parsed-passwords")]
+use crate::Position;
+
 pub struct StoreErrors<'a> {
     iter: std::slice::Iter<'a, StoreError>,
 }
@@ -36,12 +39,20 @@ pub enum StoreError {
     NotInStore(PathBuf),
     #[error("Failed to decrypt password {0}")]
     Decrypt(String, #[source] gpgme::Error),
-    #[error("Failed to parse password content for {0}")]
-    Parse(String, #[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("Invalid passphrase index {0}")]
     PassphraseIndex(usize),
     #[error("Generating passphrase failed: {0}")]
     PassphraseGeneration(&'static str),
+
+    #[cfg(feature = "parsed-passwords")]
+    #[error("Failed to parse password content for {0}")]
+    Parse(String, #[source] Box<dyn std::error::Error + Send + Sync>),
+    #[cfg(feature = "parsed-passwords")]
+    #[error("Line at position {0} is not a comment")]
+    PasswordLineNotAComment(Position),
+    #[cfg(feature = "parsed-passwords")]
+    #[error("Line at position {0} is not an entry")]
+    PasswordLineNotAnEntry(Position),
 }
 
 pub(crate) trait IntoStoreError<T> {

@@ -3,6 +3,9 @@ use std::path::PathBuf;
 
 use crate::{Directory, Password, Store, StoreError};
 
+#[cfg(feature = "passphrase-utils")]
+use crate::passphrase_utils::{AnalyzedPassphrase, PassphraseGenerator};
+
 pub struct PasswordInserter {
     pub(crate) parent: NodeId,
     pub(crate) path: PathBuf,
@@ -42,6 +45,17 @@ impl PasswordInserter {
     pub fn lines(&mut self, lines: Vec<String>) -> &mut Self {
         self.lines = lines;
         self
+    }
+
+    #[cfg(feature = "passphrase-utils")]
+    pub fn generator(&mut self) -> PassphraseGenerator<&mut Self> {
+        PassphraseGenerator::new(move |passphrase| Ok(self.passphrase(passphrase)))
+    }
+
+    #[cfg(feature = "passphrase-utils")]
+    pub fn analyze_passphrase(&self) -> Option<AnalyzedPassphrase> {
+        let passphrase = self.lines.get(0)?;
+        Some(AnalyzedPassphrase::new(passphrase))
     }
 
     pub fn insert(&self, store: &mut Store) -> Result<Password, StoreError> {

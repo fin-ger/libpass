@@ -108,7 +108,7 @@ impl DecryptedPassword {
     }
 
     #[cfg(feature = "passphrase-utils")]
-    pub fn generator(&mut self) -> PassphraseGenerator {
+    pub fn generator(&mut self) -> PassphraseGenerator<()> {
         PassphraseGenerator::new(move |passphrase| self.set_passphrase(passphrase))
     }
 
@@ -117,6 +117,12 @@ impl DecryptedPassword {
         let passphrase = self.passphrase()?;
 
         Some(AnalyzedPassphrase::new(passphrase))
+    }
+
+    pub fn batch_edit(&mut self) -> DecryptedPasswordBatchEdit {
+        DecryptedPasswordBatchEdit::new(self.lines.clone(), move |lines| {
+            self.set_lines(lines)
+        })
     }
 
     pub fn passphrase(&self) -> Option<&str> {
@@ -153,7 +159,7 @@ impl DecryptedPassword {
             removed_line = Some(std::mem::replace(old_line, line.into()));
         } else {
             removed_line = None;
-            self.lines.insert(position, line.into());
+            self.lines.push(line.into());
         }
 
         match self.save() {
@@ -181,11 +187,86 @@ impl DecryptedPassword {
         }
     }
 
+    pub fn remove_line(&mut self, position: Position) -> Result<(), StoreError> {
+        let old_lines = self.lines.clone();
+        self.lines.remove(position);
+        match self.save() {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                self.lines = old_lines;
+                Err(err)
+            }
+        }
+    }
+
     pub fn prepend_line<L: Into<String>>(&mut self, line: L) -> Result<(), StoreError> {
         self.insert_line(1, line)
     }
 
     pub fn append_line<L: Into<String>>(&mut self, line: L) -> Result<(), StoreError> {
         self.insert_line(self.lines.len(), line)
+    }
+}
+
+pub struct DecryptedPasswordBatchEdit<'a> {
+    lines: Vec<String>,
+    batch_handler: Box<dyn 'a + FnOnce(Vec<String>) -> Result<(), StoreError>>,
+}
+
+impl<'a> DecryptedPasswordBatchEdit<'a> {
+    fn new<F: 'a + FnOnce(Vec<String>) -> Result<(), StoreError>>(lines: Vec<String>, batch_handler: F) -> Self {
+        Self {
+            lines,
+            batch_handler: Box::new(batch_handler),
+        }
+    }
+
+    pub fn passphrase<P: Into<String>>(mut self, passphrase: P) -> Self {
+        if let Some(old_passphrase) = self.lines.get_mut(0) {
+            *old_passphrase = passphrase.into();
+        } else {
+            self.lines.push(passphrase.into());
+        }
+
+        self
+    }
+
+    pub fn lines<L: Into<Vec<String>>>(mut self, lines: L) -> Self {
+        self.lines = lines.into();
+        self
+    }
+
+    pub fn insert_line<L: Into<String>>(mut self, position: Position, line: L) -> Self {
+        self.lines.insert(position, line.into());
+        self
+    }
+
+    pub fn replace_line<L: Into<String>>(mut self, position: Position, line: L) -> Self {
+        if let Some(old_line) = self.lines.get_mut(position) {
+            *old_line = line.into();
+        } else {
+            self.lines.push(line.into());
+        }
+
+        self
+    }
+
+    pub fn remove_line<L: Into<String>>(mut self, position: Position) -> Self {
+        self.lines.remove(position);
+        self
+    }
+
+    pub fn append_line<L: Into<String>>(mut self, line: L) -> Self {
+        self.lines.push(line.into());
+        self
+    }
+
+    pub fn prepend_line<L: Into<String>>(mut self, line: L) -> Self {
+        self.lines.insert(0, line.into());
+        self
+    }
+
+    pub fn edit(self) -> Result<(), StoreError> {
+        (self.batch_handler)(self.lines)
     }
 }

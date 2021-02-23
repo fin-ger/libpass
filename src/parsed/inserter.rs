@@ -1,32 +1,29 @@
 use id_tree::NodeId;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
-use crate::{Password, Position, StoreError};
+use crate::{Password, StoreError};
+
+#[cfg(feature = "passphrase-utils")]
+use crate::passphrase_utils::{AnalyzedPassphrase, PassphraseGenerator};
+
+use crate::parsed::PasswordLine;
 
 pub struct PasswordInserter {
     pub(crate) parent: NodeId,
     pub(crate) path: PathBuf,
     pub(crate) name: String,
     pub(crate) passphrase: Option<String>,
-    pub(crate) comments: Vec<(Position, String)>,
-    pub(crate) entries: HashMap<String, (Position, String)>,
-    pub(crate) back: Position,
+    pub(crate) lines: Vec<PasswordLine>,
 }
 
 impl PasswordInserter {
-    pub(crate) fn new(
-        parent: NodeId,
-        path: PathBuf,
-        name: String,
-    ) -> Self {
+    pub(crate) fn new(parent: NodeId, path: PathBuf, name: String) -> Self {
         Self {
             parent,
             path,
             name,
             passphrase: None,
-            comments: Vec::new(),
-            entries: HashMap::new(),
-            back: 0,
+            lines: Vec::new(),
         }
     }
 
@@ -35,28 +32,31 @@ impl PasswordInserter {
         self
     }
 
-    pub fn comment<C: Into<String>>(&mut self, comment: C) -> &mut Self {
-        self.comments.push((self.back, comment.into()));
-        self.back += 1;
+    pub fn lines(&mut self, lines: Vec<PasswordLine>) -> &mut Self {
+        self.lines = lines;
         self
     }
 
-    pub fn comments(&mut self, comments: Vec<(Position, String)>) -> &mut Self {
-        self.comments = comments;
-        self.back = self.comments.len() + self.entries.len();
+    pub fn comment<C: Into<String>>(&mut self, comment: C) -> &mut Self {
+        self.lines.push(PasswordLine::Comment(comment.into()));
         self
     }
 
     pub fn entry<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &mut Self {
-        self.entries.insert(key.into(), (self.back, value.into()));
-        self.back += 1;
+        self.lines
+            .push(PasswordLine::Entry(key.into(), value.into()));
         self
     }
 
-    pub fn entries(&mut self, entries: HashMap<String, (Position, String)>) -> &mut Self {
-        self.entries = entries;
-        self.back = self.comments.len() + self.entries.len();
-        self
+    #[cfg(feature = "passphrase-utils")]
+    pub fn generator(&mut self) -> PassphraseGenerator<&mut Self> {
+        PassphraseGenerator::new(move |passphrase| Ok(self.passphrase(passphrase)))
+    }
+
+    #[cfg(feature = "passphrase-utils")]
+    pub fn analyze_passphrase(&self) -> Option<AnalyzedPassphrase> {
+        let passphrase = self.passphrase.as_ref()?;
+        Some(AnalyzedPassphrase::new(passphrase))
     }
 
     pub fn insert(&self, store: &mut crate::Store) -> Result<Password, StoreError> {

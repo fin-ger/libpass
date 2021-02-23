@@ -26,7 +26,7 @@ impl Store {
         _sorting: Sorting,
         _key_id: &str,
     ) -> Result<Self, StoreError> {
-        unimplemented!();
+        todo!();
     }
 
     pub(crate) fn open(
@@ -342,9 +342,7 @@ impl Store {
     ) -> Result<Password, StoreError> {
         crate::parsed::DecryptedPassword::create_and_write(
             inserter.passphrase.clone(),
-            inserter.comments.clone(),
-            inserter.entries.clone(),
-            inserter.back,
+            inserter.lines.clone(),
             &inserter.path,
         )?;
 

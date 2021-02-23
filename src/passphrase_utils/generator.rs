@@ -2,13 +2,13 @@ use passwords::PasswordGenerator;
 
 use crate::StoreError;
 
-pub struct PassphraseGenerator<'a> {
+pub struct PassphraseGenerator<'a, T> {
     generator: PasswordGenerator,
-    password_handler: Box<dyn 'a + FnOnce(String) -> Result<(), StoreError>>,
+    password_handler: Box<dyn 'a + FnOnce(String) -> Result<T, StoreError>>,
 }
 
-impl<'a> PassphraseGenerator<'a> {
-    pub(crate) fn new<F: 'a + FnOnce(String) -> Result<(), StoreError>>(
+impl<'a, T> PassphraseGenerator<'a, T> {
+    pub(crate) fn new<F: 'a + FnOnce(String) -> Result<T, StoreError>>(
         password_handler: F,
     ) -> Self {
         Self {
@@ -97,7 +97,7 @@ impl<'a> PassphraseGenerator<'a> {
         }
     }
 
-    pub fn generate(self, count: usize) -> Result<GeneratedPassphrases<'a>, StoreError> {
+    pub fn generate(self, count: usize) -> Result<GeneratedPassphrases<'a, T>, StoreError> {
         let passwords = self
             .generator
             .generate(count)
@@ -110,17 +110,17 @@ impl<'a> PassphraseGenerator<'a> {
     }
 }
 
-pub struct GeneratedPassphrases<'a> {
+pub struct GeneratedPassphrases<'a, T> {
     passwords: Vec<String>,
-    password_handler: Box<dyn 'a + FnOnce(String) -> Result<(), StoreError>>,
+    password_handler: Box<dyn 'a + FnOnce(String) -> Result<T, StoreError>>,
 }
 
-impl<'a> GeneratedPassphrases<'a> {
+impl<'a, T> GeneratedPassphrases<'a, T> {
     pub fn passphrases(&self) -> Vec<(usize, String)> {
         self.passwords.clone().into_iter().enumerate().collect()
     }
 
-    pub fn select(mut self, index: usize) -> Result<(), StoreError> {
+    pub fn select(mut self, index: usize) -> Result<T, StoreError> {
         if index >= self.passwords.len() {
             return Err(StoreError::PassphraseIndex(index));
         }
