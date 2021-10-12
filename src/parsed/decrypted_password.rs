@@ -118,7 +118,7 @@ impl DecryptedPassword {
             .open(&self.path)
             .with_store_error(self.path.display().to_string())?;
         let mut ctx = Context::from_protocol(Protocol::OpenPgp)
-            .with_store_error(self.path.display().to_string())?;
+            .with_store_error("creating OpenPGP context")?;
         let content = format!("{}", self);
         let mut encrypted = Vec::new();
         let gpg_ids = search_gpg_ids(&self.path, &mut ctx);

@@ -5,11 +5,11 @@ use std::{convert::Infallible, path::PathBuf};
 
 use anyhow::Context as AnyhowContext;
 use async_trait::async_trait;
-use cucumber_rust::{World, WorldInit};
+use cucumber::{World, WorldInit};
 use pass::{DecryptedPassword, Store, StoreBuilder, StoreError, Password, PasswordInserter};
 use tempdir::TempDir;
 
-#[derive(WorldInit)]
+#[derive(Debug, WorldInit)]
 pub enum IncrementalWorld {
     // You can use this struct for mutable context in scenarios.
     Initial,

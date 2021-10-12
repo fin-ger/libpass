@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use cucumber_rust::given;
+use cucumber::given;
 
 use crate::world::IncrementalWorld;
 

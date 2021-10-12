@@ -37,6 +37,7 @@ pub(crate) fn search_gpg_ids(mut path: &Path, ctx: &mut Context) -> Vec<Key> {
 
 pub type Position = usize;
 
+#[derive(Debug)]
 pub struct DecryptedPassword {
     lines: Vec<String>,
     path: PathBuf,
@@ -55,7 +56,7 @@ impl DecryptedPassword {
     pub(crate) fn from_path(path: &Path) -> Result<Self, StoreError> {
         let mut pw = File::open(path).with_store_error(path.display().to_string())?;
         let mut ctx = Context::from_protocol(Protocol::OpenPgp)
-            .with_store_error(path.display().to_string())?;
+            .with_store_error("creating OpenPGP context")?;
         let mut content = Vec::new();
         // TODO: Add passphrase provider
         ctx.decrypt(&mut pw, &mut content)

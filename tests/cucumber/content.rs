@@ -1,6 +1,6 @@
 use std::panic::AssertUnwindSafe;
 
-use cucumber_rust::{then, when};
+use cucumber::{then, when};
 use pass::TraversalOrder;
 
 use crate::world::IncrementalWorld;

@@ -27,7 +27,7 @@ impl<'a> Iterator for StoreErrors<'a> {
 
 #[derive(Error, Debug)]
 pub enum StoreError {
-    #[error("Could not open or modify entries in password store")]
+    #[error("Could not open or modify entry {0} in password store")]
     Io(String, #[source] io::Error),
     #[error("Password store path is not a directory: {0}")]
     NoDirectory(PathBuf),
@@ -37,8 +37,10 @@ pub enum StoreError {
     NoHome(String, #[source] Box<StoreError>),
     #[error("Given path is not contained in the password store: {0}")]
     NotInStore(PathBuf),
-    #[error("Failed to decrypt password {0}")]
-    Decrypt(String, #[source] gpgme::Error),
+    #[error("GPG operation failed: {0}")]
+    Gpg(String, #[source] gpgme::Error),
+    #[error("No GPG IDs found in directory {0} and all its parents")]
+    NoGpgId(String),
     #[error("Invalid passphrase index {0}")]
     PassphraseIndex(usize),
     #[error("Generating passphrase failed: {0}")]
@@ -78,8 +80,8 @@ impl<T> IntoStoreError<T> for Result<T, StoreError> {
 }
 
 impl<T> IntoStoreError<T> for Result<T, gpgme::Error> {
-    fn with_store_error<S: Into<String>>(self: Self, path: S) -> Result<T, StoreError> {
-        self.map_err(|err| StoreError::Decrypt(path.into(), err))
+    fn with_store_error<S: Into<String>>(self: Self, op: S) -> Result<T, StoreError> {
+        self.map_err(|err| StoreError::Gpg(op.into(), err))
     }
 }
 

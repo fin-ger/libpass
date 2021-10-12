@@ -11,6 +11,7 @@ use crate::{
     TraversalOrder, Umask, Git,
 };
 
+#[derive(Debug)]
 pub struct Store {
     path: PathBuf,
     tree: Tree<PassNode>,
@@ -255,7 +256,7 @@ impl Store {
                 .data()
                 .path();
             if path == root_path {
-                return Ok(Entries::new(&self.tree, node_id, order));
+                return Ok(Entries::new(&self.tree, self.path.clone(), node_id, order));
             }
         }
 
@@ -289,7 +290,7 @@ impl Store {
         let node_id =
             id.expect("Store entry not found in password store although it must be available!");
 
-        Ok(Entries::new(&self.tree, node_id, order))
+        Ok(Entries::new(&self.tree, self.path.clone(), node_id, order))
     }
 
     pub fn mut_directory(&mut self, directory: Directory) -> MutDirectory {
@@ -297,6 +298,7 @@ impl Store {
             directory.name().to_string(),
             directory.path().to_owned(),
             &mut self.tree,
+            self.path.clone(),
             directory.node_id().to_owned(),
         )
     }
@@ -306,12 +308,13 @@ impl Store {
             password.name().to_owned(),
             password.path().to_owned(),
             &mut self.tree,
+            self.path.clone(),
             password.node_id().to_owned(),
         )
     }
 
     pub fn mut_entry(&mut self, entry: Entry) -> MutEntry {
-        MutEntry::new(entry.node_id().to_owned(), &mut self.tree)
+        MutEntry::new(entry.node_id().to_owned(), &mut self.tree, self.path.clone())
     }
 
     fn insert_password_into_tree(
@@ -329,7 +332,7 @@ impl Store {
             .insert(node, InsertBehavior::UnderNode(parent))
             .expect("Parent of inserted password does not exist in internal tree");
 
-        Password::new(name, path, node_id)
+        Password::new(name, path, self.path.clone(), node_id)
     }
 
     pub fn insert_password(&mut self, inserter: &PasswordInserter) -> Result<Password, StoreError> {

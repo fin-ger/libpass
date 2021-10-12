@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use id_tree::{LevelOrderTraversalIds, NodeId, PostOrderTraversalIds, PreOrderTraversalIds, Tree};
 
 use crate::{Entry, PassNode};
@@ -17,11 +19,13 @@ enum EntriesTraversal<'a> {
 pub struct Entries<'a> {
     iter: EntriesTraversal<'a>,
     tree: &'a Tree<PassNode>,
+    root: PathBuf,
 }
 
 impl<'a> Entries<'a> {
     pub(crate) fn new(
         tree: &'a Tree<PassNode>,
+        root: PathBuf,
         node_id: &'a NodeId,
         order: TraversalOrder,
     ) -> Self {
@@ -40,7 +44,7 @@ impl<'a> Entries<'a> {
             ),
         };
 
-        Self { iter, tree }
+        Self { iter, tree, root }
     }
 }
 
@@ -60,6 +64,6 @@ impl<'a> Iterator for Entries<'a> {
             .expect("node id for node which must exists not found")
             .data()
             .clone();
-        Some(Entry::new(node_id, data))
+        Some(Entry::new(node_id, data, self.root.clone()))
     }
 }

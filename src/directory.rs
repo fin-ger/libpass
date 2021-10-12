@@ -1,21 +1,28 @@
+use gpgme::{Context, Protocol};
 use id_tree::{NodeId, Tree};
 
-use std::path::{Path, PathBuf};
+use std::{
+    fs::OpenOptions,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
-use crate::{DirectoryInserter, PassNode, PasswordInserter, Store};
+use crate::{DirectoryInserter, IntoStoreError, PassNode, PasswordInserter, Store, StoreError};
 
 pub struct Directory {
     name: String,
     path: PathBuf,
     node_id: NodeId,
+    root: PathBuf,
 }
 
 impl Directory {
-    pub(crate) fn new(name: String, path: PathBuf, node_id: NodeId) -> Self {
+    pub(crate) fn new(name: String, path: PathBuf, root: PathBuf, node_id: NodeId) -> Self {
         Self {
             name,
             path,
             node_id,
+            root,
         }
     }
 
@@ -49,9 +56,45 @@ impl Directory {
         &self.path
     }
 
-    /*pub fn gpg_ids(&self) -> impl Iterator<Item = &str> {
-        todo!();
-    }*/
+    pub fn gpg_ids(&self) -> Result<Vec<String>, StoreError> {
+        let mut ctx = Context::from_protocol(Protocol::OpenPgp)
+            .with_store_error("creating OpenPGP context")?;
+        let mut path = self.path.as_path();
+        loop {
+            let gpg_id = path.join(".gpg-id");
+            if gpg_id.is_file() {
+                let mut file = OpenOptions::new()
+                    .read(true)
+                    .open(&gpg_id)
+                    .with_store_error(gpg_id.display().to_string())?;
+                let mut content = String::new();
+                file.read_to_string(&mut content)
+                    .with_store_error(gpg_id.display().to_string())?;
+
+                return content
+                    .lines()
+                    .map(|line| {
+                        Ok(ctx
+                            .get_key(line)
+                            .with_store_error("GPG ID not found")?
+                            .id()
+                            .expect("GPG ID not valid utf-8")
+                            .to_string())
+                    })
+                    .collect::<Result<Vec<String>, StoreError>>();
+            }
+
+            if let Some(parent) = path.parent() {
+                if path.starts_with(&self.root) {
+                    path = parent
+                } else {
+                    return Err(StoreError::NoGpgId(self.path.display().to_string()));
+                }
+            } else {
+                return Err(StoreError::NoGpgId(self.path.display().to_string()))
+            }
+        }
+    }
 
     pub fn parent(&self, store: &Store) -> Option<Directory> {
         let parent_id = store.tree().ancestor_ids(&self.node_id).ok()?.next()?;
@@ -60,6 +103,7 @@ impl Directory {
         Some(Directory::new(
             parent.data().name().to_owned(),
             parent.data().path().to_owned(),
+            self.root.clone(),
             parent_id.clone(),
         ))
     }
@@ -82,6 +126,7 @@ pub struct MutDirectory<'a> {
     name: String,
     path: PathBuf,
     tree: &'a mut Tree<PassNode>,
+    root: PathBuf,
     node_id: NodeId,
 }
 
@@ -90,12 +135,14 @@ impl<'a> MutDirectory<'a> {
         name: String,
         path: PathBuf,
         tree: &'a mut Tree<PassNode>,
+        root: PathBuf,
         node_id: NodeId,
     ) -> Self {
         Self {
             name,
             path,
             tree,
+            root,
             node_id,
         }
     }
@@ -135,6 +182,7 @@ impl<'a> MutDirectory<'a> {
         Some(Directory::new(
             parent.data().name().to_owned(),
             parent.data().path().to_owned(),
+            self.root.clone(),
             parent_id.clone(),
         ))
     }

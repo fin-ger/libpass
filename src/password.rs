@@ -5,17 +5,20 @@ use id_tree::{NodeId, Tree};
 
 use crate::{DecryptedPassword, Directory, PassNode, Store, StoreError};
 
+#[derive(Debug)]
 pub struct Password {
     name: String,
     path: PathBuf,
     node_id: NodeId,
+    root: PathBuf
 }
 
 impl Password {
-    pub(crate) fn new(name: String, path: PathBuf, node_id: NodeId) -> Self {
+    pub(crate) fn new(name: String, path: PathBuf, root: PathBuf, node_id: NodeId) -> Self {
         Self {
             name,
             path,
+            root,
             node_id,
         }
     }
@@ -43,6 +46,7 @@ impl Password {
         Directory::new(
             parent.data().name().to_owned(),
             parent.data().path().to_owned(),
+            self.root.clone(),
             parent_id.clone(),
         )
     }
@@ -64,6 +68,7 @@ pub struct MutPassword<'a> {
     name: String,
     path: PathBuf,
     tree: &'a mut Tree<PassNode>,
+    root: PathBuf,
     node_id: NodeId,
 }
 
@@ -72,12 +77,14 @@ impl<'a> MutPassword<'a> {
         name: String,
         path: PathBuf,
         tree: &'a mut Tree<PassNode>,
+        root: PathBuf,
         node: NodeId,
     ) -> Self {
         Self {
             name,
             path,
             tree,
+            root,
             node_id: node,
         }
     }
@@ -105,6 +112,7 @@ impl<'a> MutPassword<'a> {
         Directory::new(
             parent.data().name().to_owned(),
             parent.data().path().to_owned(),
+            self.root.clone(),
             parent_id.clone(),
         )
     }

@@ -4,7 +4,7 @@ mod preparation;
 mod world;
 
 use anyhow::Context as AnyhowContext;
-use cucumber_rust::WorldInit;
+use cucumber::WorldInit;
 use gpgme::{Context, CreateKeyFlags, PassphraseRequest, PinentryMode, Protocol};
 use std::{env, fs, io::Write, path::Path, process::Command};
 use world::IncrementalWorld;
@@ -18,12 +18,10 @@ fn main() {
     fs::create_dir_all(&pgp_home).expect("Could not create temporary home folder for PGP home");
     initialize_pgp_home(&pgp_home).expect("Failed to initialize PGP home");
 
-    let runner = IncrementalWorld::init(&["./features"]);
-
     // You may choose any executor you like (Tokio, async-std, etc)
     // You may even have an async main, it doesn't matter. The point is that
     // Cucumber is composable. :)
-    futures::executor::block_on(runner.run());
+    futures::executor::block_on(IncrementalWorld::run("./features"));
 
     fs::remove_dir_all(&pgp_home).expect("Could not cleanup PGP home");
 }

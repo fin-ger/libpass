@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum PassNode {
     Directory { name: String, path: PathBuf },
     Password { name: String, path: PathBuf },

@@ -2,7 +2,7 @@ use std::env;
 use std::io::Write;
 use std::panic::AssertUnwindSafe;
 
-use cucumber_rust::{given, then, when};
+use cucumber::{given, then, when};
 use gpgme::PassphraseRequest;
 use pass::{Location, PassphraseProvider, SigningKey, Sorting, StoreBuilder, Umask};
 

@@ -7,6 +7,7 @@ use git2::Config;
 
 pub struct GitStatus;
 
+#[derive(Debug)]
 pub struct Git {
     path: PathBuf,
     //config: Config,
