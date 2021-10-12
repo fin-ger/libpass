@@ -92,6 +92,8 @@ impl IncrementalWorld {
         let key_id = String::from("test@key.email");
         let builder = AssertUnwindSafe(StoreBuilder::default());
 
+        println!("\nClean test environment prepared for {}", home.path().display());
+
         Ok(IncrementalWorld::Prepared {
             envs,
             builder,

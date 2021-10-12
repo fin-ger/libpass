@@ -37,6 +37,12 @@ fn initialize_pgp_home(home: &Path) -> anyhow::Result<()> {
         .open(home.join(".gnupg").join("gpg-agent.conf"))?;
     gpg_agent_conf.write_all("allow-preset-passphrase\n".as_bytes())?;
     gpg_agent_conf.flush()?;
+    Command::new("find")
+        .args(&[&format!("{}/.gnupg", home.display()), "-type", "f", "-exec", "chmod", "600", "{}", ";"])
+        .status().unwrap();
+    Command::new("find")
+        .args(&[&format!("{}/.gnupg", home.display()), "-type", "d", "-exec", "chmod", "700", "{}", ";"])
+        .status().unwrap();
 
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)
         .context("Could not create GPG context")?
@@ -70,6 +76,8 @@ fn initialize_pgp_home(home: &Path) -> anyhow::Result<()> {
         .env("GNUPGHOME", home.join(".gnupg"))
         .output()
         .expect("Could not set passphrase in gpg-agent");
+
+    println!("GPG environment initialized for all tests");
 
     Ok(())
 }

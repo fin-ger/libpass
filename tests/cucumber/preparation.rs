@@ -48,10 +48,13 @@ fn a_password_store_exists(world: &mut IncrementalWorld, location: String) {
 
         let status = Command::new("pass")
             .args(&["init", key_id.as_str()])
-            .envs(envs)
+            .envs(envs.clone())
+            .stdout(Stdio::null())
             .status()
             .unwrap();
         assert!(status.success(), "Failed to initialize pass repository!");
+
+        println!("Password store initialized for {}", key_id);
     } else {
         panic!("World state is not Prepared!");
     }
@@ -63,6 +66,7 @@ fn insert_password(envs: &HashMap<String, String>, name: &str, content: &str) {
         .env_clear()
         .envs(envs)
         .stdin(Stdio::piped())
+        .stdout(Stdio::null())
         .spawn()
         .unwrap();
 
@@ -77,7 +81,7 @@ fn insert_password(envs: &HashMap<String, String>, name: &str, content: &str) {
 
 #[given(regex = "passwords are stored in the password store")]
 fn passwords_are_stored_in_the_password_store(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::Prepared { envs, .. } = world {
+    if let IncrementalWorld::Prepared { envs, home, .. } = world {
         insert_password(
             envs,
             "Manufacturers/Yoyodyne",
@@ -99,6 +103,13 @@ fn passwords_are_stored_in_the_password_store(world: &mut IncrementalWorld) {
             "Entertainment/Holo Deck/Broht & Forrester",
             "fun-times1337\nusername: geordi\n",
         );
+
+        let store_path = envs.get("PASSWORD_STORE_DIR").map(|s| s.to_owned())
+            .unwrap_or(format!("{}", home.path().join(".password-store").display()));
+        Command::new("tree")
+            .args(&["--noreport", &store_path])
+            .status()
+            .unwrap();
     } else {
         panic!("World state is not Prepared!");
     }
@@ -137,6 +148,7 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
                 password_store_remote.display().to_string(),
             )
             .stdin(Stdio::piped())
+            .stdout(Stdio::null())
             .spawn()
             .unwrap();
 
