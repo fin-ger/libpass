@@ -3,7 +3,7 @@ Feature: Git operations in the password store
     Given a password store exists
     And a password store is opened
     When the password store is successfully opened
-    And a password is created
+    And a new password is created
     And the password is committed
     Then the repository is clean and contains a new commit
 

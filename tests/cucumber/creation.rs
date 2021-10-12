@@ -353,10 +353,10 @@ fn a_new_password_store_is_initialized(world: &mut IncrementalWorld, location: S
                 Location::Manual(path)
             }
             _ => {
-                panic!(format!(
+                panic!(
                     "Invalid location '{}' for password store initialization!",
                     location,
-                ));
+                );
             }
         };
         *world = IncrementalWorld::Created {
@@ -381,10 +381,10 @@ fn a_password_store_is_opened(world: &mut IncrementalWorld, location: String) {
                 Location::Manual(path)
             }
             _ => {
-                panic!(format!(
+                panic!(
                     "Invalid location '{}' for password store opening!",
                     location,
-                ));
+                );
             }
         };
 
@@ -432,10 +432,10 @@ fn the_operation_of_the_password_store_fails(world: &mut IncrementalWorld) {
 fn the_password_store_has_no_errors(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
         if store.has_errors() {
-            panic!(format!(
+            panic!(
                 "Store had errors when it should not have any: {:?}",
                 store.errors().collect::<Vec<_>>(),
-            ));
+            );
         }
     } else {
         panic!("World state is not Successful!");

@@ -3,10 +3,13 @@ use std::path::{Path, PathBuf};
 use crate::DecryptedPassword;
 use thiserror::Error;
 
+use git2::Config;
+
 pub struct GitStatus;
 
-pub struct GitRepository {
-    pub path: PathBuf,
+pub struct Git {
+    path: PathBuf,
+    //config: Config,
 }
 
 #[derive(Error, Debug)]
@@ -14,8 +17,8 @@ pub enum GitError {}
 
 type GitResult<T> = Result<T, GitError>;
 
-impl GitRepository {
-    pub fn new(path: PathBuf) -> Self {
+impl Git {
+    pub(crate) fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
@@ -44,7 +47,22 @@ impl GitRepository {
         Ok(())
     }
 
-    pub fn config_valid(&mut self) -> bool {
+    pub fn config_valid(&self) -> bool {
+        let config = match Config::open_default() {
+            Ok(config) => config,
+            Err(_) => return false,
+        };
+        let entries = match config.entries(None) {
+            Ok(entries) => entries,
+            Err(_) => return false,
+        };
+
+        println!("{:?}", entries.filter_map(|e| {
+            let e = e.ok()?;
+            let name = e.name()?;
+            Some(name.to_string())
+        }).collect::<Vec<_>>());
+
         false
     }
 

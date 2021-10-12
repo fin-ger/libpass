@@ -11,10 +11,10 @@ fn the_password_store_is_empty(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
         let length = store.show(".", TraversalOrder::LevelOrder).unwrap().count();
         if length > 0 {
-            panic!(format!(
+            panic!(
                 "Store is not empty when it should be! Actual length: {}",
                 length
-            ));
+            );
         }
     } else {
         panic!("World state is not Successful!");
@@ -25,10 +25,10 @@ fn the_password_store_is_empty(world: &mut IncrementalWorld) {
 fn the_password_stores_directory_exists(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
         if !store.location().exists() {
-            panic!(format!(
+            panic!(
                 "Store directory does not exist when it should exist! Path: {}",
                 store.location().display(),
-            ));
+            );
         }
     } else {
         panic!("World state is not Successful!");
@@ -40,10 +40,10 @@ fn the_password_stores_directory_does_not_exist(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Failure { home } = world {
         let path = home.path().join(".password-store");
         if path.exists() {
-            panic!(format!(
+            panic!(
                 "Store directory exists when it shouldn't! Path: {}",
                 path.display(),
-            ));
+            );
         }
     } else {
         panic!("World state is not Failure!");
@@ -55,10 +55,10 @@ fn the_password_stores_directory_contains_a_gpg_id_file(world: &mut IncrementalW
     if let IncrementalWorld::Successful { store, .. } = world {
         let path = store.location().join(".gpg-id");
         if !path.exists() {
-            panic!(format!(
+            panic!(
                 "Store directory does not contain a GPG ID file! Path: {}",
                 path.display(),
-            ));
+            );
         }
     } else {
         panic!("World state is not Successful!");
@@ -88,21 +88,25 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
             if *is_dir {
                 assert!(
                     entry.is_dir(),
-                    format!("{} is not a directory", entry.path().display()),
+                    "{} is not a directory",
+                    entry.path().display(),
                 );
             } else {
                 assert!(
                     entry.is_password(),
-                    format!("{} is not a password", entry.path().display()),
+                    "{} is not a password",
+                    entry.path().display(),
                 );
             }
             assert!(
                 entry.path().ends_with(expected_path),
-                format!("path {} has no suffix {}", entry.path().display(), expected_path),
+                "path {} has no suffix {}",
+                entry.path().display(), expected_path,
             );
             assert!(
                 entry.name() == *expected_name,
-                format!("name {} is not {}", entry.name(), expected_name),
+                "name {} is not {}",
+                entry.name(), expected_name,
             );
         }
 
@@ -181,6 +185,27 @@ fn content_of_a_non_existing_password_is_searched_in_the_password_store(
             .map(|password| password.decrypt().expect("could not decrypt password"))
             .collect::<Vec<_>>();
         *world = IncrementalWorld::Grep { found_passwords };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a new password is created")]
+fn a_new_password_is_created(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { store, .. } = world {
+        let mut root = store.show("./", TraversalOrder::LevelOrder)
+            .expect("could not get root directory of password store")
+            .next()
+            .expect("could not get root directory of password store")
+            .directory()
+            .expect("Root directory is not a directory");
+
+        let password = root.password_insertion("Shuttle Bay")
+            .passphrase("0p3n-5354m3")
+            .insert(store)
+            .expect("Password insertion failed");
+
+        *world = IncrementalWorld::NewPassword { password };
     } else {
         panic!("World state is not Successful!");
     }

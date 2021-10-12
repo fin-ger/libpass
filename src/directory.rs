@@ -21,7 +21,7 @@ impl Directory {
 
     pub fn password_insertion<N: Into<String>>(&mut self, name: N) -> PasswordInserter {
         let name = name.into();
-        let path = self.path.join(&name);
+        let path = self.path.join(format!("{}.gpg", name));
         PasswordInserter::new(self.node_id.clone(), path, name)
     }
 

@@ -39,10 +39,10 @@ fn a_password_store_exists(world: &mut IncrementalWorld, location: String) {
                 );
             }
             _ => {
-                panic!(format!(
+                panic!(
                     "Invalid location '{}' for password insertion!",
                     location,
-                ));
+                );
             }
         };
 

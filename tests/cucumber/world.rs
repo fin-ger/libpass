@@ -6,7 +6,7 @@ use std::{convert::Infallible, path::PathBuf};
 use anyhow::Context as AnyhowContext;
 use async_trait::async_trait;
 use cucumber_rust::{World, WorldInit};
-use pass::{DecryptedPassword, Store, StoreBuilder, StoreError};
+use pass::{DecryptedPassword, Store, StoreBuilder, StoreError, Password, PasswordInserter};
 use tempdir::TempDir;
 
 #[derive(WorldInit)]
@@ -39,6 +39,9 @@ pub enum IncrementalWorld {
     },
     Grep {
         found_passwords: Vec<DecryptedPassword>,
+    },
+    NewPassword {
+        password: Password,
     },
 }
 

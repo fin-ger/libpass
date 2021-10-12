@@ -8,13 +8,14 @@ use crate::{
     DecryptedPassword, Directory, DirectoryInserter, Entries, Entry, IntoStoreError, Location,
     MatchedEntries, MatchedPasswords, MutDirectory, MutEntry, MutPassword, PassNode,
     PassphraseProvider, Password, PasswordInserter, SigningKey, Sorting, StoreError, StoreErrors,
-    TraversalOrder, Umask,
+    TraversalOrder, Umask, Git,
 };
 
 pub struct Store {
     path: PathBuf,
     tree: Tree<PassNode>,
     errors: Vec<StoreError>,
+    git: Git,
 }
 
 impl Store {
@@ -59,9 +60,11 @@ impl Store {
         }
 
         let tree = Tree::new();
+        let git = Git::new(path.to_owned());
         let mut me = Self {
             path,
             tree,
+            git,
             errors: Vec::new(),
         };
         me.load_passwords();
@@ -215,6 +218,10 @@ impl Store {
         )
     }
 
+    pub fn git<'a>(&'a self) -> &'a Git {
+        &self.git
+    }
+
     /// Either a relative path from the store's root or an absolute path where the
     /// password store's location is a prefix of the path.
     ///
@@ -326,7 +333,7 @@ impl Store {
     }
 
     pub fn insert_password(&mut self, inserter: &PasswordInserter) -> Result<Password, StoreError> {
-        DecryptedPassword::create_and_write(inserter.lines.clone(), &self.path)?;
+        DecryptedPassword::create_and_write(inserter.lines.clone(), &self.path.join(&inserter.path))?;
 
         Ok(self.insert_password_into_tree(
             inserter.name.clone(),
