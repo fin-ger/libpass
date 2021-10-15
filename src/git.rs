@@ -1,26 +1,38 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::fmt;
 
 use crate::DecryptedPassword;
 use thiserror::Error;
 
-use git2::Config;
+use git2::{Config, Repository};
+use custom_debug::Debug;
 
 pub struct GitStatus;
 
+fn debug_repository(repo: &Repository, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Repository {{ workdir: {:?}, state: {:?} }}", repo.workdir(), repo.state())
+}
+
 #[derive(Debug)]
 pub struct Git {
-    path: PathBuf,
+    #[debug(with = "debug_repository")]
+    repo: Repository,
     //config: Config,
 }
 
 #[derive(Error, Debug)]
-pub enum GitError {}
+pub enum GitError {
+    #[error("Could not open git repository")]
+    Open(#[source] git2::Error),
+}
 
 type GitResult<T> = Result<T, GitError>;
 
 impl Git {
-    pub(crate) fn new(path: PathBuf) -> Self {
-        Self { path }
+    pub(crate) fn new(path: &Path) -> GitResult<Self> {
+        let repo = Repository::open(path).map_err(|e| GitError::Open(e))?;
+
+        Ok(Self { repo })
     }
 
     // TODO: handle merge conflict
@@ -53,18 +65,37 @@ impl Git {
             Ok(config) => config,
             Err(_) => return false,
         };
-        let entries = match config.entries(None) {
+        let mut entries = &match config.entries(None) {
             Ok(entries) => entries,
             Err(_) => return false,
         };
 
-        println!("{:?}", entries.filter_map(|e| {
-            let e = e.ok()?;
-            let name = e.name()?;
-            Some(name.to_string())
-        }).collect::<Vec<_>>());
+        let has_email = entries.any(|e| {
+            let e = match e.ok() {
+                Some(e) => e,
+                None => return false,
+            };
+            let name = match e.name() {
+                Some(name) => name,
+                None => return false,
+            };
 
-        false
+            name == "user.email"
+        });
+        let has_name = entries.any(|e| {
+            let e = match e.ok() {
+                Some(e) => e,
+                None => return false,
+            };
+            let name = match e.name() {
+                Some(name) => name,
+                None => return false,
+            };
+
+            name == "user.name"
+        });
+
+        has_email && has_name
     }
 
     pub fn config_set_user_name(&mut self, _name: &str) -> GitResult<()> {

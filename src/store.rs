@@ -61,7 +61,7 @@ impl Store {
         }
 
         let tree = Tree::new();
-        let git = Git::new(path.to_owned());
+        let git = Git::new(&path).with_store_error("open repository")?;
         let mut me = Self {
             path,
             tree,

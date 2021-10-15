@@ -12,16 +12,17 @@ use world::IncrementalWorld;
 const DIR: bool = true;
 const PW: bool = false;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let pgp_home = env::temp_dir().join("libpass-pgp-home");
     fs::remove_dir_all(&pgp_home).ok();
     fs::create_dir_all(&pgp_home).expect("Could not create temporary home folder for PGP home");
     initialize_pgp_home(&pgp_home).expect("Failed to initialize PGP home");
 
-    // You may choose any executor you like (Tokio, async-std, etc)
-    // You may even have an async main, it doesn't matter. The point is that
-    // Cucumber is composable. :)
-    futures::executor::block_on(IncrementalWorld::run("./features"));
+    IncrementalWorld::cucumber()
+        .max_concurrent_scenarios(Some(num_cpus::get()))
+        .run("./features")
+        .await;
 
     fs::remove_dir_all(&pgp_home).expect("Could not cleanup PGP home");
 }
