@@ -4,6 +4,7 @@ use rand::seq::SliceRandom;
 
 fn main() -> Result<()> {
     let store = StoreBuilder::default().open()?;
+    assert!(!store.has_errors());
     let mut root_password = store
         .show(
             "./Enterprise/Self-Destruct Sequence.gpg",

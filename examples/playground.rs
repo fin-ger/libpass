@@ -9,6 +9,7 @@ fn main() -> Result<()> {
         .location(Location::Manual(repo_path.clone()))
         .open()?;
 
+    assert!(!store.has_errors());
     assert!(store.git().context("no git repo")?.config_valid());
 
     let mut root = store.show("./", TraversalOrder::LevelOrder)?
