@@ -6,7 +6,7 @@ use std::{convert::Infallible, path::PathBuf};
 use anyhow::Context as AnyhowContext;
 use async_trait::async_trait;
 use cucumber::{World, WorldInit};
-use pass::{DecryptedPassword, Store, StoreBuilder, StoreError, Password, PasswordInserter};
+use pass::{DecryptedPassword, Store, StoreBuilder, StoreError, Password};
 use tempdir::TempDir;
 
 #[derive(Debug, WorldInit)]

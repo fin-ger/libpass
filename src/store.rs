@@ -16,7 +16,7 @@ pub struct Store {
     path: PathBuf,
     tree: Tree<PassNode>,
     errors: Vec<StoreError>,
-    git: Git,
+    git: Option<Git>,
 }
 
 impl Store {
@@ -61,7 +61,7 @@ impl Store {
         }
 
         let tree = Tree::new();
-        let git = Git::new(&path).with_store_error("open repository")?;
+        let git = Git::open(&path).with_store_error("open repository")?;
         let mut me = Self {
             path,
             tree,
@@ -219,8 +219,12 @@ impl Store {
         )
     }
 
-    pub fn git<'a>(&'a self) -> &'a Git {
-        &self.git
+    pub fn has_git(&self) -> bool {
+        self.git.is_some()
+    }
+
+    pub fn git<'a>(&'a mut self) -> Option<&'a mut Git> {
+        self.git.as_mut()
     }
 
     /// Either a relative path from the store's root or an absolute path where the

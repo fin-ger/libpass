@@ -2,9 +2,8 @@ use std::path::Path;
 use std::fmt;
 
 use crate::DecryptedPassword;
-use thiserror::Error;
 
-use git2::{Config, Repository};
+use git2::{Config, ObjectType, Repository};
 use custom_debug::Debug;
 
 pub struct GitStatus;
@@ -17,22 +16,18 @@ fn debug_repository(repo: &Repository, f: &mut fmt::Formatter) -> fmt::Result {
 pub struct Git {
     #[debug(with = "debug_repository")]
     repo: Repository,
-    //config: Config,
 }
 
-#[derive(Error, Debug)]
-pub enum GitError {
-    #[error("Could not open git repository")]
-    Open(#[source] git2::Error),
-}
-
-type GitResult<T> = Result<T, GitError>;
+type GitResult<T> = Result<T, git2::Error>;
 
 impl Git {
-    pub(crate) fn new(path: &Path) -> GitResult<Self> {
-        let repo = Repository::open(path).map_err(|e| GitError::Open(e))?;
-
-        Ok(Self { repo })
+    pub(crate) fn open(path: &Path) -> GitResult<Option<Self>> {
+        if path.join(".git").is_dir() {
+            let repo = Repository::open(path)?;
+            Ok(Some(Self { repo }))
+        } else {
+            Ok(None)
+        }
     }
 
     // TODO: handle merge conflict
@@ -52,11 +47,36 @@ impl Git {
         Ok(GitStatus)
     }
 
-    pub fn commit(&mut self, _message: &str) -> GitResult<()> {
+    pub fn commit(&mut self, message: &str) -> GitResult<()> {
+        let me = self.repo.signature()?;
+        let tree_id = self.repo.index()?.write_tree()?;
+        let tree = self.repo.find_tree(tree_id)?;
+        // FIXME: closure hack until try-blocks are stable
+        let last_commit = (|| {
+            self.repo
+                .head().ok()?
+                .resolve().ok()?
+                .peel(ObjectType::Commit).ok()?
+                .into_commit().ok()
+        })();
+        let parents = last_commit.iter().collect::<Vec<_>>();
+
+        self.repo.commit(
+            Some("HEAD"),
+            &me,
+            &me,
+            message,
+            &tree,
+            &parents,
+        )?;
         Ok(())
     }
 
-    pub fn add(&mut self, _paths: &[&Path]) -> GitResult<()> {
+    pub fn add(&mut self, paths: &[&Path]) -> GitResult<()> {
+        for path in paths {
+            self.repo.index()?.add_path(path)?
+        }
+        self.repo.index()?.write()?;
         Ok(())
     }
 

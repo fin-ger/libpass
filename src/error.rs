@@ -2,8 +2,6 @@ use std::{env, io, path::PathBuf};
 
 use thiserror::Error;
 
-use crate::GitError;
-
 pub struct StoreErrors<'a> {
     iter: std::slice::Iter<'a, StoreError>,
 }
@@ -45,7 +43,7 @@ pub enum StoreError {
     #[error("Generating passphrase failed: {0}")]
     PassphraseGeneration(&'static str),
     #[error("The git operation {0} failed")]
-    GitError(String, #[source] GitError),
+    GitError(String, #[source] git2::Error),
 
     #[cfg(feature = "parsed-passwords")]
     #[error("Failed to parse password content for {0}")]
@@ -86,7 +84,7 @@ impl<T> IntoStoreError<T> for Result<T, gpgme::Error> {
     }
 }
 
-impl<T> IntoStoreError<T> for Result<T, GitError> {
+impl<T> IntoStoreError<T> for Result<T, git2::Error> {
     fn with_store_error<S: Into<String>>(self: Self, operation: S) -> Result<T, StoreError> {
         self.map_err(|err| StoreError::GitError(operation.into(), err))
     }

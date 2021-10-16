@@ -4,7 +4,7 @@ mod preparation;
 mod world;
 
 use anyhow::Context as AnyhowContext;
-use cucumber::WorldInit;
+use cucumber::{FailureWriter, WorldInit};
 use gpgme::{Context, CreateKeyFlags, PassphraseRequest, PinentryMode, Protocol};
 use std::{env, fs, io::Write, path::Path, process::Command};
 use world::IncrementalWorld;
@@ -19,12 +19,24 @@ async fn main() {
     fs::create_dir_all(&pgp_home).expect("Could not create temporary home folder for PGP home");
     initialize_pgp_home(&pgp_home).expect("Failed to initialize PGP home");
 
-    IncrementalWorld::cucumber()
+    let summary = IncrementalWorld::cucumber()
         .max_concurrent_scenarios(Some(num_cpus::get()))
         .run("./features")
         .await;
 
     fs::remove_dir_all(&pgp_home).expect("Could not cleanup PGP home");
+
+    if summary.execution_has_failed() {
+        let failed_steps = summary.failed_steps();
+        let parsing_errors = summary.parsing_errors();
+        panic!(
+            "{} step{} failed, {} parsing error{}",
+            failed_steps,
+            (failed_steps != 1).then(|| "s").unwrap_or_default(),
+            parsing_errors,
+            (parsing_errors != 1).then(|| "s").unwrap_or_default(),
+        );
+    }
 }
 
 fn initialize_pgp_home(home: &Path) -> anyhow::Result<()> {
