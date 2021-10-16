@@ -339,6 +339,24 @@ impl Store {
         Password::new(name, path, self.path.clone(), node_id)
     }
 
+    fn insert_directory_into_tree(
+        &mut self,
+        name: String,
+        path: PathBuf,
+        parent: &NodeId,
+    ) -> Directory {
+        let node = Node::new(PassNode::Directory {
+            name: name.clone(),
+            path: path.clone(),
+        });
+        let node_id = self
+            .tree
+            .insert(node, InsertBehavior::UnderNode(parent))
+            .expect("Parent of inserted directory does not exist in internal tree");
+
+        Directory::new(name, path, self.path.clone(), node_id)
+    }
+
     pub fn insert_password(&mut self, inserter: &PasswordInserter) -> Result<Password, StoreError> {
         DecryptedPassword::create_and_write(inserter.lines.clone(), &self.path.join(&inserter.path))?;
 
@@ -369,9 +387,16 @@ impl Store {
 
     pub fn insert_directory(
         &mut self,
-        _inserter: &DirectoryInserter,
+        inserter: &DirectoryInserter,
     ) -> Result<Directory, StoreError> {
-        todo!();
+        fs::create_dir(&inserter.path)
+            .with_store_error(inserter.path.display().to_string())?;
+
+        Ok(self.insert_directory_into_tree(
+            inserter.name.clone(),
+            inserter.path.clone(),
+            &inserter.parent,
+        ))
     }
 
     pub fn location(&self) -> &Path {

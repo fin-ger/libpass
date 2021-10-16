@@ -41,6 +41,8 @@ pub enum IncrementalWorld {
         found_passwords: Vec<DecryptedPassword>,
     },
     NewPassword {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
         password: Password,
     },
 }

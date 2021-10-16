@@ -73,7 +73,9 @@ impl Git {
     }
 
     pub fn add(&mut self, paths: &[&Path]) -> GitResult<()> {
+        let workdir = self.repo.workdir().unwrap();
         for path in paths {
+            let path = path.strip_prefix(workdir).unwrap();
             self.repo.index()?.add_path(path)?
         }
         self.repo.index()?.write()?;

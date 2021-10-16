@@ -45,7 +45,7 @@ impl Directory {
     pub fn directory_insertion<N: Into<String>>(&mut self, name: N) -> DirectoryInserter {
         let name = name.into();
         let path = self.path.join(&name);
-        DirectoryInserter::new(path, name)
+        DirectoryInserter::new(self.node_id.clone(), path, name)
     }
 
     pub fn name(&self) -> &str {

@@ -1,6 +1,7 @@
 Feature: Git operations in the password store
   Scenario: Commit a new password
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a new password is created
@@ -9,6 +10,7 @@ Feature: Git operations in the password store
 
   Scenario: Commit an edited password
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a password is edited
@@ -17,6 +19,7 @@ Feature: Git operations in the password store
 
   Scenario: Commit a removed password
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a password is removed
@@ -25,6 +28,7 @@ Feature: Git operations in the password store
 
   Scenario: Commit a renamed password
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a password is renamed
@@ -33,6 +37,7 @@ Feature: Git operations in the password store
 
   Scenario: Commit a new directory
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a directory is created
@@ -41,6 +46,7 @@ Feature: Git operations in the password store
 
   Scenario: Commit a renamed directory
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a directory is renamed
@@ -49,6 +55,7 @@ Feature: Git operations in the password store
 
   Scenario: Commit a removed directory
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a directory is removed
@@ -57,12 +64,14 @@ Feature: Git operations in the password store
 
   Scenario: Query the status of an unaltered password store
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     Then the repository is clean
 
   Scenario: Query the status of an altered password store
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a password is created
@@ -70,6 +79,7 @@ Feature: Git operations in the password store
 
   Scenario: Push fast-forward commits to the git remote
     Given a password store exists
+    And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a password is created
@@ -79,6 +89,7 @@ Feature: Git operations in the password store
 
   Scenario: Push of non-fastforward commits to the git remote fails
     Given a password store exists
+    And the password store uses git
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened
@@ -89,6 +100,7 @@ Feature: Git operations in the password store
 
   Scenario: Pull fast-forward changes from git remote without interaction
     Given a password store exists
+    And the password store uses git
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened
@@ -97,6 +109,7 @@ Feature: Git operations in the password store
 
   Scenario: Pull non-fast-forward changes from the git remote with automatic merging
     Given a password store exists
+    And the password store uses git
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened
@@ -107,6 +120,7 @@ Feature: Git operations in the password store
 
   Scenario: Pull non-fast-forward changes from the git remote with manual merging and resolve merge conflict by letting the user resolve it using decrypted passwords
     Given a password store exists
+    And the password store uses git
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened

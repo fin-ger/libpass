@@ -1,5 +1,6 @@
 use crate::{IntoStoreError, StoreError};
-use gpgme::{Context, Protocol, Key};
+use gpgme::{Context, Key, Protocol};
+use tempfile::NamedTempFile;
 use std::{
     fmt,
     fs::{File, OpenOptions},
@@ -11,7 +12,8 @@ use std::{
 #[cfg(feature = "passphrase-utils")]
 use crate::passphrase_utils::{AnalyzedPassphrase, PassphraseGenerator};
 
-pub(crate) fn search_gpg_ids(mut path: &Path, ctx: &mut Context) -> Vec<Key> {
+pub(crate) fn search_gpg_ids(mut path: &Path, ctx: &mut Context) -> Result<Vec<Key>, StoreError> {
+    let original_path = path.to_owned();
     loop {
         if path.is_dir() && path.join(".gpg-id").is_file() {
             let mut file = OpenOptions::new()
@@ -21,16 +23,16 @@ pub(crate) fn search_gpg_ids(mut path: &Path, ctx: &mut Context) -> Vec<Key> {
             let mut content = String::new();
             file.read_to_string(&mut content).expect("not valid utf-8");
 
-            return content
+            return Ok(content
                 .lines()
                 .map(|line| ctx.get_key(line).expect("Key not found"))
-                .collect();
+                .collect());
         }
 
         if let Some(parent) = path.parent() {
             path = parent
         } else {
-            return Vec::new();
+            return Err(StoreError::NoGpgId(original_path.display().to_string()));
         }
     }
 }
@@ -83,24 +85,31 @@ impl DecryptedPassword {
     }
 
     fn save(&self) -> Result<(), StoreError> {
-        let mut f = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&self.path)
+        let mut f = NamedTempFile::new_in(self.path.parent().unwrap())
             .with_store_error(self.path.display().to_string())?;
 
         let mut ctx = Context::from_protocol(Protocol::OpenPgp)
             .with_store_error(self.path.display().to_string())?;
         let content = format!("{}", self);
         let mut encrypted = Vec::new();
-        let gpg_ids = search_gpg_ids(&self.path, &mut ctx);
-        ctx.encrypt(gpg_ids.iter(), content, &mut encrypted)
+        let gpg_ids = search_gpg_ids(&self.path, &mut ctx)?;
+        let result = ctx.encrypt(gpg_ids.iter(), content, &mut encrypted)
             .with_store_error(self.path.display().to_string())?;
+        if result.invalid_recipients().count() > 0 {
+            return Err(StoreError::Gpg("Could not encrypt for all gpg-id's".to_owned(), gpgme::Error::BAD_PUBKEY));
+        }
+        if encrypted.len() <= 0 {
+            return Err(StoreError::Gpg(format!("Could not encrypt {}", self.path.display().to_string()), gpgme::Error::NOT_ENCRYPTED));
+        }
 
         f.write_all(&encrypted)
             .with_store_error(self.path.display().to_string())?;
-        f.flush().with_store_error(self.path.display().to_string())
+        f.flush().with_store_error(self.path.display().to_string())?;
+
+        f.persist(&self.path)
+            .with_store_error(self.path.display().to_string())?;
+
+        Ok(())
     }
 
     #[cfg(feature = "parsed-passwords")]

@@ -1,6 +1,6 @@
-use std::{fs::File, io::Write, path::{Path, PathBuf}};
+use std::path::PathBuf;
 
-use pass::{Location, StoreBuilder};
+use pass::{Location, StoreBuilder, TraversalOrder};
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
@@ -11,17 +11,38 @@ fn main() -> Result<()> {
 
     assert!(store.git().context("no git repo")?.config_valid());
 
-    let mut first_file = File::create(repo_path.join("first_file.txt"))?;
-    first_file.write_all("This is the content of the first file".as_bytes())?;
+    let mut root = store.show("./", TraversalOrder::LevelOrder)?
+        .next()
+        .context("Could not retrieve root directory")?
+        .directory()
+        .context("Could not retrieve root directory")?;
 
-    store.git().context("no git repo")?.add(&[&Path::new("first_file.txt")])?;
-    store.git().context("no git repo")?.commit("First file added")?;
+    let shuttle_bay = root.password_insertion("Shuttle Bay")
+        .passphrase("0p3n-5354m3")
+        .insert(&mut store)?;
 
-    let mut second_file = File::create(repo_path.join("second_file.txt"))?;
-    second_file.write_all("This is the content of the second file".as_bytes())?;
+    store.git().context("no git repo")?.add(&[shuttle_bay.path()])?;
+    store.git().context("no git repo")?.commit("Add 'Shuttle Bay' password")?;
 
-    store.git().context("no git repo")?.add(&[&Path::new("second_file.txt")])?;
-    store.git().context("no git repo")?.commit("Second file added")?;
+    let mut manufacturers = root.directory_insertion("Manufacturers")
+        .insert(&mut store)?;
+
+    let yoyodyne = manufacturers.password_insertion("Yoyodyne")
+        .generator()
+        .exclude_similar_characters(false)
+        .length(20)
+        .lowercase_letters(true)
+        .numbers(true)
+        .uppercase_letters(true)
+        .spaces(true)
+        .symbols(true)
+        .strict(true)
+        .generate(10)?
+        .select(7)?
+        .insert(&mut store)?;
+
+    store.git().context("no git repo")?.add(&[yoyodyne.path()])?;
+    store.git().context("no git repo")?.commit("Add 'Manufacturers/Yoyodyne' password")?;
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 use std::{env, io, path::PathBuf};
 
+use tempfile::PersistError;
 use thiserror::Error;
 
 pub struct StoreErrors<'a> {
@@ -36,12 +37,14 @@ pub enum StoreError {
     NotInStore(PathBuf),
     #[error("GPG operation failed: {0}")]
     Gpg(String, #[source] gpgme::Error),
-    #[error("No GPG IDs found in directory {0} and all its parents")]
+    #[error("No GPG IDs found for '{0}' and all its parent directories")]
     NoGpgId(String),
     #[error("Invalid passphrase index {0}")]
     PassphraseIndex(usize),
     #[error("Generating passphrase failed: {0}")]
     PassphraseGeneration(&'static str),
+    #[error("Failed to persist temporary passphrase for {0}")]
+    PassphrasePersist(String, #[source] PersistError),
     #[error("The git operation {0} failed")]
     GitError(String, #[source] git2::Error),
 
@@ -87,6 +90,12 @@ impl<T> IntoStoreError<T> for Result<T, gpgme::Error> {
 impl<T> IntoStoreError<T> for Result<T, git2::Error> {
     fn with_store_error<S: Into<String>>(self: Self, operation: S) -> Result<T, StoreError> {
         self.map_err(|err| StoreError::GitError(operation.into(), err))
+    }
+}
+
+impl<T> IntoStoreError<T> for Result<T, PersistError> {
+    fn with_store_error<S: Into<String>>(self: Self, passphrase_path: S) -> Result<T, StoreError> {
+        self.map_err(|err| StoreError::PassphrasePersist(passphrase_path.into(), err))
     }
 }
 

@@ -192,7 +192,10 @@ fn content_of_a_non_existing_password_is_searched_in_the_password_store(
 
 #[when("a new password is created")]
 fn a_new_password_is_created(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::Successful { store, .. } = world {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { mut store, home } = prev {
         let mut root = store.show("./", TraversalOrder::LevelOrder)
             .expect("could not get root directory of password store")
             .next()
@@ -202,11 +205,26 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
 
         let password = root.password_insertion("Shuttle Bay")
             .passphrase("0p3n-5354m3")
-            .insert(store)
+            .insert(&mut store)
             .expect("Password insertion failed");
 
-        *world = IncrementalWorld::NewPassword { password };
+        *world = IncrementalWorld::NewPassword { store, home, password };
     } else {
         panic!("World state is not Successful!");
+    }
+}
+
+#[when("the password is committed")]
+fn the_password_is_committed(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::NewPassword { store, home, password } = world {
+        let git = store.git()
+            .expect("password store not using git");
+
+        git.add(&[password.path()])
+            .expect("failed to add password to git");
+        git.commit("Add new password")
+            .expect("failed to commit new password to git");
+    } else {
+        panic!("World state is not NewPassword!");
     }
 }

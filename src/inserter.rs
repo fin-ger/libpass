@@ -64,13 +64,14 @@ impl PasswordInserter {
 }
 
 pub struct DirectoryInserter {
-    pub path: PathBuf,
-    pub name: String,
+    pub(crate) parent: NodeId,
+    pub(crate) path: PathBuf,
+    pub(crate) name: String,
 }
 
 impl DirectoryInserter {
-    pub(crate) fn new(path: PathBuf, name: String) -> Self {
-        Self { name, path }
+    pub(crate) fn new(parent: NodeId, path: PathBuf, name: String) -> Self {
+        Self { parent, name, path }
     }
 
     pub fn insert(&self, store: &mut Store) -> Result<Directory, StoreError> {

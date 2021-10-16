@@ -122,8 +122,14 @@ impl DecryptedPassword {
         let content = format!("{}", self);
         let mut encrypted = Vec::new();
         let gpg_ids = search_gpg_ids(&self.path, &mut ctx);
-        ctx.encrypt(gpg_ids.iter(), content, &mut encrypted)
+        let result = ctx.encrypt(gpg_ids.iter(), content, &mut encrypted)
             .with_store_error(self.path.display().to_string())?;
+        if result.invalid_recipients().count() > 0 {
+            return Err(StoreError::Gpg("Could not encrypt for all gpg-id's".to_owned(), gpgme::Error::BAD_PUBKEY));
+        }
+        if encrypted.len() <= 0 {
+            return Err(StoreError::Gpg(format!("Could not encrypt {}", self.path.display().to_string()), gpgme::Error::NOT_ENCRYPTED));
+        }
 
         f.write_all(&encrypted)
             .with_store_error(self.path.display().to_string())?;

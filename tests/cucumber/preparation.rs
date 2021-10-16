@@ -48,13 +48,46 @@ fn a_password_store_exists(world: &mut IncrementalWorld, location: String) {
 
         let status = Command::new("pass")
             .args(&["init", key_id.as_str()])
-            .envs(envs.clone())
+            .envs(envs)
             .stdout(Stdio::null())
             .status()
             .unwrap();
         assert!(status.success(), "Failed to initialize pass repository!");
 
         println!("Password store initialized for {}", key_id);
+    } else {
+        panic!("World state is not Prepared!");
+    }
+}
+
+#[given("the password store uses git")]
+fn the_password_store_uses_git(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared {
+        envs, ..
+    } = world {
+        let status = Command::new("pass")
+            .args(&["git", "init"])
+            .envs(envs.clone())
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to initialize git in pass repository!");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.name", "Test User"])
+            .envs(envs.clone())
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set username in git config");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.email", "test@key.email"])
+            .envs(envs.clone())
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set email in git config");
     } else {
         panic!("World state is not Prepared!");
     }
