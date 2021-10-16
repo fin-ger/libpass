@@ -1,4 +1,5 @@
 use std::panic::AssertUnwindSafe;
+use std::process::{Command, Stdio};
 
 use cucumber::{then, when};
 use pass::TraversalOrder;
@@ -67,7 +68,7 @@ fn the_password_stores_directory_contains_a_gpg_id_file(world: &mut IncrementalW
 
 #[then("the password store contains passwords")]
 fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::Successful { store, home } =
+    if let IncrementalWorld::Successful { store, home, envs } =
         std::mem::replace(world, IncrementalWorld::Initial)
     {
         let expected = [
@@ -113,9 +114,39 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
         *world = IncrementalWorld::Successful {
             store: AssertUnwindSafe(store),
             home,
+            envs,
         };
     } else {
         panic!("World state is not Successful!");
+    }
+}
+
+#[then("the repository is clean and contains a new commit")]
+fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::NewPassword { envs, .. } = world {
+        let output = Command::new("pass")
+            .args(&["git", "status", "--porcelain"])
+            .envs(envs.clone())
+            .stdout(Stdio::piped())
+            .output()
+            .expect("Could not check git state");
+        let stdout = String::from_utf8(output.stdout)
+            .expect("Could not read stdout as UTF-8");
+        assert!(stdout == "", "Repository not clean");
+
+        let output = Command::new("pass")
+            .args(&["git", "log", "--pretty=format:%s"])
+            .envs(envs.clone())
+            .stdout(Stdio::piped())
+            .output()
+            .expect("Could not check git commit");
+        let stdout = String::from_utf8(output.stdout)
+            .expect("Could not read stdout as UTF-8");
+
+        assert!(stdout.lines().count() == 1, "Not enough commits");
+        assert!(stdout.lines().next().unwrap() == "Add new password");
+    } else {
+        panic!("World state is not NewPassword!");
     }
 }
 
@@ -195,7 +226,7 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Successful { mut store, home } = prev {
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
         let mut root = store.show("./", TraversalOrder::LevelOrder)
             .expect("could not get root directory of password store")
             .next()
@@ -208,7 +239,7 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
             .insert(&mut store)
             .expect("Password insertion failed");
 
-        *world = IncrementalWorld::NewPassword { store, home, password };
+        *world = IncrementalWorld::NewPassword { store, home, envs, password };
     } else {
         panic!("World state is not Successful!");
     }
@@ -216,7 +247,7 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
 
 #[when("the password is committed")]
 fn the_password_is_committed(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::NewPassword { store, home, password } = world {
+    if let IncrementalWorld::NewPassword { store, password, .. } = world {
         let git = store.git()
             .expect("password store not using git");
 

@@ -23,10 +23,12 @@ pub enum IncrementalWorld {
     Created {
         home: TempDir,
         store: AssertUnwindSafe<Result<Store, StoreError>>,
+        envs: HashMap<String, String>,
     },
     Successful {
         home: TempDir,
         store: AssertUnwindSafe<Store>,
+        envs: HashMap<String, String>,
     },
     Failure {
         home: TempDir,
@@ -44,6 +46,7 @@ pub enum IncrementalWorld {
         home: TempDir,
         store: AssertUnwindSafe<Store>,
         password: Password,
+        envs: HashMap<String, String>,
     },
 }
 

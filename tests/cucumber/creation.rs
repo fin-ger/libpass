@@ -345,7 +345,7 @@ fn a_new_password_store_is_initialized(world: &mut IncrementalWorld, location: S
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Prepared { home, key_id, .. } = prev {
+    if let IncrementalWorld::Prepared { home, key_id, envs, .. } = prev {
         let location = match location.as_str() {
             "" => Location::Automatic,
             " at a manually provided location" => {
@@ -362,6 +362,7 @@ fn a_new_password_store_is_initialized(world: &mut IncrementalWorld, location: S
         *world = IncrementalWorld::Created {
             store: AssertUnwindSafe(StoreBuilder::default().location(location).init(&key_id)),
             home,
+            envs,
         };
     } else {
         panic!("World state is not Prepared!");
@@ -373,7 +374,7 @@ fn a_password_store_is_opened(world: &mut IncrementalWorld, location: String) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Prepared { home, .. } = prev {
+    if let IncrementalWorld::Prepared { home, envs, .. } = prev {
         let location = match location.as_str() {
             "" => Location::Automatic,
             " at a manually provided location" => {
@@ -391,6 +392,7 @@ fn a_password_store_is_opened(world: &mut IncrementalWorld, location: String) {
         *world = IncrementalWorld::Created {
             store: AssertUnwindSafe(StoreBuilder::default().location(location).open()),
             home,
+            envs,
         };
     } else {
         panic!("World state is not Prepared!");
@@ -402,10 +404,11 @@ fn password_store_is_successfully(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Created { store, home } = prev {
+    if let IncrementalWorld::Created { store, home, envs } = prev {
         *world = IncrementalWorld::Successful {
             store: AssertUnwindSafe(store.0.unwrap()),
             home,
+            envs,
         };
     } else {
         panic!("World state is not Created!");
@@ -417,7 +420,7 @@ fn the_operation_of_the_password_store_fails(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Created { store, home } = prev {
+    if let IncrementalWorld::Created { store, home, .. } = prev {
         if store.0.is_err() {
             *world = IncrementalWorld::Failure { home };
         } else {
