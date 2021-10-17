@@ -123,31 +123,78 @@ fn the_password_store_contains_passwords(world: &mut IncrementalWorld) {
 
 #[then("the repository is clean and contains a new commit")]
 fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::NewPassword { envs, .. } = world {
-        let output = Command::new("pass")
-            .args(&["git", "status", "--porcelain"])
-            .envs(envs.clone())
-            .stdout(Stdio::piped())
-            .output()
-            .expect("Could not check git state");
-        let stdout = String::from_utf8(output.stdout)
-            .expect("Could not read stdout as UTF-8");
-        assert!(stdout == "", "Repository not clean");
+    let envs = match world {
+        IncrementalWorld::NewPassword { envs, .. } => envs,
+        IncrementalWorld::EditedPassword { envs, .. } => envs,
+        IncrementalWorld::RemovedPassword { envs, .. } => envs,
+        _ => panic!("World state is not NewPassword!"),
+    };
 
-        let output = Command::new("pass")
-            .args(&["git", "log", "--pretty=format:%s"])
-            .envs(envs.clone())
-            .stdout(Stdio::piped())
-            .output()
-            .expect("Could not check git commit");
-        let stdout = String::from_utf8(output.stdout)
-            .expect("Could not read stdout as UTF-8");
+    let output = Command::new("pass")
+        .args(&["git", "status", "--porcelain"])
+        .envs(envs.clone())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Could not check git state");
+    let stdout = String::from_utf8(output.stdout)
+        .expect("Could not read stdout as UTF-8");
+    assert_eq!(stdout, "", "Repository not clean");
 
-        assert!(stdout.lines().count() == 1, "Not enough commits");
-        assert!(stdout.lines().next().unwrap() == "Add new password");
-    } else {
-        panic!("World state is not NewPassword!");
-    }
+    let output = Command::new("pass")
+        .args(&["git", "log", "--pretty=format:%s"])
+        .envs(envs.clone())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Could not check git commit");
+    let stdout = String::from_utf8(output.stdout)
+        .expect("Could not read stdout as UTF-8");
+
+    match world {
+        IncrementalWorld::NewPassword { envs, .. } => {
+            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().next().unwrap(), "Add new password");
+
+            let output = Command::new("pass")
+                .args(&["show", "Ready Room"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .output()
+                .expect("Could not read Ready Room password content");
+            let pw_content = String::from_utf8(output.stdout)
+                .expect("Cloud not read stdout as UTF-8");
+
+            assert_eq!(pw_content, "what-are-our-options\n");
+        }
+        IncrementalWorld::EditedPassword { envs, .. } => {
+            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().next().unwrap(), "Edit Sokor password");
+
+            let output = Command::new("pass")
+                .args(&["show", "Manufacturers/Sokor"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .output()
+                .expect("Could not read Sokor password content");
+            let pw_content = String::from_utf8(output.stdout)
+                .expect("Cloud not read stdout as UTF-8");
+
+            assert_eq!(pw_content, "pum-yIghoSQo'\nBetter not tell Picard about this.\nNote: Picard already knows...\n");
+        }
+        IncrementalWorld::RemovedPassword { envs, .. } => {
+            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().next().unwrap(), "Remove Sokor password");
+
+            let status = Command::new("pass")
+                .args(&["show", "Manufacturers/Sokor"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .status()
+                .expect("Could not read Sokor password content");
+
+            assert!(!status.success(), "Password Sokor has not been removed!");
+        }
+        _ => unreachable!(),
+    };
 }
 
 #[when("a password is opened")]
@@ -234,8 +281,8 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
             .directory()
             .expect("Root directory is not a directory");
 
-        let password = root.password_insertion("Shuttle Bay")
-            .passphrase("0p3n-5354m3")
+        let password = root.password_insertion("Ready Room")
+            .passphrase("what-are-our-options")
             .insert(&mut store)
             .expect("Password insertion failed");
 
@@ -245,17 +292,85 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
     }
 }
 
-#[when("the password is committed")]
-fn the_password_is_committed(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::NewPassword { store, password, .. } = world {
-        let git = store.git()
-            .expect("password store not using git");
+#[when(regex = "the (.*) is committed")]
+fn the_x_is_committed(world: &mut IncrementalWorld) {
+    match world {
+        IncrementalWorld::NewPassword { store, password, .. } => {
+            let git = store.git()
+                .expect("password store not using git");
 
-        git.add(&[password.path()])
-            .expect("failed to add password to git");
-        git.commit("Add new password")
-            .expect("failed to commit new password to git");
+            git.add(&[password.path()])
+                .expect("failed to add password to git");
+            git.commit("Add new password")
+                .expect("failed to commit new password to git");
+        }
+        IncrementalWorld::EditedPassword { store, password, .. } => {
+            let git = store.git()
+                .expect("password store not using git");
+
+            git.add(&[password.path()])
+                .expect("failed to add password to git");
+            git.commit("Edit Sokor password")
+                .expect("failed to commit edited password to git");
+        }
+        IncrementalWorld::RemovedPassword { store, path, .. } => {
+            let git = store.git()
+                .expect("password store not using git");
+
+            git.add(&[&path])
+                .expect("failed to add removal to git");
+            git.commit("Remove Sokor password")
+                .expect("failed to commit removed password to git");
+        }
+        _ => {
+            panic!("World state is not NewPassword!");
+        }
+    }
+}
+
+#[when("a password is edited")]
+fn a_password_is_edited(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { store, home, envs } = prev {
+        let password = store.show("Manufacturers/Sokor", TraversalOrder::LevelOrder)
+            .expect("could not find Sokor password")
+            .next()
+            .expect("could not find Sokor password")
+            .password()
+            .expect("Sokor is not a password");
+        password
+            .decrypt()
+            .expect("Could not decrypt Sokor")
+            .append_line("Note: Picard already knows...")
+            .expect("Failed to append line to Sokor");
+
+        *world = IncrementalWorld::EditedPassword { store, home, envs, password };
     } else {
-        panic!("World state is not NewPassword!");
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a password is removed")]
+fn a_password_is_removed(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        let password = store.show("Manufacturers/Sokor", TraversalOrder::LevelOrder)
+            .expect("could not find Sokor password")
+            .next()
+            .expect("could not find Sokor password")
+            .password()
+            .expect("Sokor is not a password");
+        let path = password.path().to_owned();
+        password
+            .make_mut(&mut store)
+            .remove();
+
+        *world = IncrementalWorld::RemovedPassword { store, home, envs, path };
+    } else {
+        panic!("World state is not Successful!");
     }
 }

@@ -247,9 +247,21 @@ impl Store {
             return Err(StoreError::NotInStore(path));
         }
 
-        let path = path
-            .canonicalize()
-            .with_store_error(path.display().to_string())?;
+        let path = match path.canonicalize() {
+            Ok(path) => path,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                if let Ok(path) = path.with_extension("gpg").canonicalize() {
+                    path
+                } else {
+                    return Err(err)
+                        .with_store_error(path.display().to_string());
+                }
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_store_error(path.display().to_string());
+            }
+        };
 
         let mut id = self.tree.root_node_id();
         if let Some(node_id) = id {

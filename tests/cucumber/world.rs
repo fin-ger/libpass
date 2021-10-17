@@ -48,6 +48,18 @@ pub enum IncrementalWorld {
         password: Password,
         envs: HashMap<String, String>,
     },
+    EditedPassword {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        password: Password,
+        envs: HashMap<String, String>,
+    },
+    RemovedPassword {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        path: PathBuf,
+        envs: HashMap<String, String>,
+    },
 }
 
 #[async_trait(?Send)]
