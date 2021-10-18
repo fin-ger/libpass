@@ -14,7 +14,7 @@ use crate::{
 #[derive(Debug)]
 pub struct Store {
     path: PathBuf,
-    tree: Tree<PassNode>,
+    pub(crate) tree: Tree<PassNode>,
     errors: Vec<StoreError>,
     git: Option<Git>,
 }
@@ -311,26 +311,20 @@ impl Store {
 
     pub fn mut_directory(&mut self, directory: Directory) -> MutDirectory {
         MutDirectory::new(
-            directory.name().to_string(),
-            directory.path().to_owned(),
-            &mut self.tree,
-            self.path.clone(),
             directory.node_id().to_owned(),
+            self,
         )
     }
 
     pub fn mut_password(&mut self, password: Password) -> MutPassword {
         MutPassword::new(
-            password.name().to_owned(),
-            password.path().to_owned(),
-            &mut self.tree,
-            self.path.clone(),
             password.node_id().to_owned(),
+            self,
         )
     }
 
     pub fn mut_entry(&mut self, entry: Entry) -> MutEntry {
-        MutEntry::new(entry.node_id().to_owned(), &mut self.tree, self.path.clone())
+        MutEntry::new(entry.node_id().to_owned(), self)
     }
 
     fn insert_password_into_tree(

@@ -47,7 +47,7 @@ impl Git {
         Ok(GitStatus)
     }
 
-    pub fn commit(&mut self, message: &str) -> GitResult<()> {
+    pub(crate) fn commit(&mut self, message: &str) -> GitResult<()> {
         let me = self.repo.signature()?;
         let tree_id = self.repo.index()?.write_tree()?;
         let tree = self.repo.find_tree(tree_id)?;
@@ -72,11 +72,15 @@ impl Git {
         Ok(())
     }
 
-    pub fn add(&mut self, paths: &[&Path]) -> GitResult<()> {
+    pub(crate) fn add(&mut self, paths: &[&Path]) -> GitResult<()> {
         let workdir = self.repo.workdir().unwrap();
         for path in paths {
-            let path = path.strip_prefix(workdir).unwrap();
-            self.repo.index()?.add_path(path)?
+            let relative = path.strip_prefix(workdir).unwrap();
+            if path.exists() {
+                self.repo.index()?.add_path(relative)?;
+            } else {
+                self.repo.index()?.remove_path(relative)?;
+            }
         }
         self.repo.index()?.write()?;
         Ok(())

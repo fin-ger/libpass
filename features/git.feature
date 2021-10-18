@@ -6,7 +6,6 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And a new password is created
-    And the password is committed
     Then the repository is clean and contains a new commit
 
   Scenario: Commit an edited password
@@ -16,7 +15,6 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is edited
-    And the password is committed
     Then the repository is clean and contains a new commit
 
   Scenario: Commit a removed password
@@ -26,7 +24,6 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is removed
-    And the removal is committed
     Then the repository is clean and contains a new commit
 
   Scenario: Commit a renamed password
@@ -36,7 +33,6 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is renamed
-    And the renaming is committed
     Then the repository is clean and contains a new commit
 
   Scenario: Commit a new directory
@@ -45,7 +41,6 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And a directory is created
-    And the directory is committed
     Then the repository is clean and contains a new commit
 
   Scenario: Commit a renamed directory
@@ -55,7 +50,6 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And a directory is renamed
-    And the directory is committed
     Then the repository is clean and contains a new commit
 
   Scenario: Commit a removed directory
@@ -65,7 +59,6 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And a directory is removed
-    And the removal is committed
     Then the repository is clean and contains a new commit
 
   Scenario: Query the status of an unaltered password store

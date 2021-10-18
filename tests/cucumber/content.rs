@@ -127,7 +127,8 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         IncrementalWorld::NewPassword { envs, .. } => envs,
         IncrementalWorld::EditedPassword { envs, .. } => envs,
         IncrementalWorld::RemovedPassword { envs, .. } => envs,
-        _ => panic!("World state is not NewPassword!"),
+        IncrementalWorld::RenamedPassword { envs, .. } => envs,
+        _ => panic!("World state is invalid!"),
     };
 
     let output = Command::new("pass")
@@ -182,7 +183,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         }
         IncrementalWorld::RemovedPassword { envs, .. } => {
             assert_eq!(stdout.lines().count(), 6, "Not enough commits");
-            assert_eq!(stdout.lines().next().unwrap(), "Remove Sokor password");
+            assert_eq!(stdout.lines().next().unwrap(), "Remove Manufacturers/Sokor from store.");
 
             let status = Command::new("pass")
                 .args(&["show", "Manufacturers/Sokor"])
@@ -192,6 +193,19 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
                 .expect("Could not read Sokor password content");
 
             assert!(!status.success(), "Password Sokor has not been removed!");
+        }
+        IncrementalWorld::RenamedPassword { envs, .. } => {
+            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().next().unwrap(), "Rename Manufacturers/Sokor to Manufacturers/None of your concern.");
+
+            let status = Command::new("pass")
+                .args(&["show", "Manufacturers/None of your concern"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .status()
+                .expect("Could not read Sokor password content");
+
+            assert!(status.success(), "Sokor password has not been renamed!");
         }
         _ => unreachable!(),
     };
@@ -292,42 +306,6 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
     }
 }
 
-#[when(regex = "the (.*) is committed")]
-fn the_x_is_committed(world: &mut IncrementalWorld) {
-    match world {
-        IncrementalWorld::NewPassword { store, password, .. } => {
-            let git = store.git()
-                .expect("password store not using git");
-
-            git.add(&[password.path()])
-                .expect("failed to add password to git");
-            git.commit("Add new password")
-                .expect("failed to commit new password to git");
-        }
-        IncrementalWorld::EditedPassword { store, password, .. } => {
-            let git = store.git()
-                .expect("password store not using git");
-
-            git.add(&[password.path()])
-                .expect("failed to add password to git");
-            git.commit("Edit Sokor password")
-                .expect("failed to commit edited password to git");
-        }
-        IncrementalWorld::RemovedPassword { store, path, .. } => {
-            let git = store.git()
-                .expect("password store not using git");
-
-            git.add(&[&path])
-                .expect("failed to add removal to git");
-            git.commit("Remove Sokor password")
-                .expect("failed to commit removed password to git");
-        }
-        _ => {
-            panic!("World state is not NewPassword!");
-        }
-    }
-}
-
 #[when("a password is edited")]
 fn a_password_is_edited(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
@@ -367,9 +345,34 @@ fn a_password_is_removed(world: &mut IncrementalWorld) {
         let path = password.path().to_owned();
         password
             .make_mut(&mut store)
-            .remove();
+            .remove()
+            .expect("Could not remove password");
 
         *world = IncrementalWorld::RemovedPassword { store, home, envs, path };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a password is renamed")]
+fn a_password_is_renamed(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        let mut password = store.show("Manufacturers/Sokor", TraversalOrder::LevelOrder)
+            .expect("could not find Sokor password")
+            .next()
+            .expect("could not find Sokor password")
+            .password()
+            .expect("Sokor is not a password")
+            .make_mut(&mut store);
+        password
+            .rename("None of your concern")
+            .expect("Could not rename password");
+        let password = password.make_immut();
+
+        *world = IncrementalWorld::RenamedPassword { store, home, envs, password };
     } else {
         panic!("World state is not Successful!");
     }

@@ -1,13 +1,9 @@
 use gpgme::{Context, Protocol};
-use id_tree::{NodeId, Tree};
+use id_tree::{NodeId, RemoveBehavior};
 
-use std::{
-    fs::OpenOptions,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::{fs::{self, OpenOptions}, io::Read, path::{Path, PathBuf}};
 
-use crate::{DirectoryInserter, IntoStoreError, PassNode, PasswordInserter, Store, StoreError};
+use crate::{DirectoryInserter, IntoStoreError, MutEntry, Traversal, PassNode, PasswordInserter, Store, StoreError};
 
 pub struct Directory {
     name: String,
@@ -96,7 +92,9 @@ impl Directory {
         }
     }
 
-    pub fn parent(&self, store: &Store) -> Option<Directory> {
+    pub fn parent(self, store: &Store) -> Option<Directory> {
+        // consume self here, to avoid a parent directory being removed and
+        // having references to node_ids of child directory entries
         let parent_id = store.tree().ancestor_ids(&self.node_id).ok()?.next()?;
         let parent = store.tree().get(&parent_id).ok()?;
 
@@ -117,89 +115,109 @@ impl Directory {
     }
 }
 
-pub enum OpMode {
-    Default,
-    Recursive,
-}
-
 pub struct MutDirectory<'a> {
-    name: String,
-    path: PathBuf,
-    tree: &'a mut Tree<PassNode>,
-    root: PathBuf,
+    store: &'a mut Store,
     node_id: NodeId,
 }
 
 impl<'a> MutDirectory<'a> {
     pub(crate) fn new(
-        name: String,
-        path: PathBuf,
-        tree: &'a mut Tree<PassNode>,
-        root: PathBuf,
         node_id: NodeId,
+        store: &'a mut Store,
     ) -> Self {
         Self {
-            name,
-            path,
-            tree,
-            root,
             node_id,
+            store,
         }
     }
 
+    fn to_entry(&'_ mut self) -> MutEntry<'_> {
+        MutEntry::new(self.node_id.clone(), self.store)
+    }
+
+    fn data(&self) -> &PassNode {
+        self.store.tree.get(&self.node_id).unwrap().data()
+    }
+
     pub fn name(&self) -> &str {
-        &self.name
+        &self.data().name()
     }
 
     pub fn path(&self) -> &Path {
-        &self.path
+        &self.data().path()
     }
 
     /*pub fn gpg_ids(&self) -> impl Iterator<Item = &str> {
         todo!();
     }*/
 
-    pub fn add_gpg_id(&self, gpg_id: &str) {
+    pub fn add_gpg_id(&self, _gpg_id: &str) {
         todo!();
     }
 
-    pub fn remove_gpg_id(&self, gpg_id: &str) {
+    pub fn remove_gpg_id(&self, _gpg_id: &str) {
         todo!();
     }
 
-    pub fn clear_gpg_ids(&self, gpg_id: &str) {
+    pub fn clear_gpg_ids(&self, _gpg_id: &str) {
         todo!();
     }
 
-    pub fn set_gpg_ids(&self, gpg_ids: Vec<&str>) {
+    pub fn set_gpg_ids(&self, _gpg_ids: Vec<&str>) {
         todo!();
     }
 
-    pub fn parent(&self) -> Option<Directory> {
-        let parent_id = self.tree.ancestor_ids(&self.node_id).ok()?.next()?;
-        let parent = self.tree.get(&parent_id).ok()?;
+    pub fn parent(self) -> Option<Directory> {
+        // consume self here, to avoid a parent directory being removed and
+        // having references to node_ids of child directory entries
+        let parent_id = self.store.tree.ancestor_ids(&self.node_id).ok()?.next()?;
+        let parent = self.store.tree.get(&parent_id).ok()?;
 
         Some(Directory::new(
             parent.data().name().to_owned(),
             parent.data().path().to_owned(),
-            self.root.clone(),
+            self.store.location().to_owned(),
             parent_id.clone(),
         ))
     }
 
-    pub fn remove(self, _op_mode: OpMode) {
-        todo!();
+    pub fn remove(self, traversal: Traversal) -> Result<(), StoreError> {
+        let path = self.path().to_owned();
+
+        match traversal {
+            Traversal::None => {
+                fs::remove_dir(&path)
+                    .with_store_error("Could not remove directory as it is not empty")?;
+            }
+            Traversal::Recursive => {
+                fs::remove_dir_all(&path)
+                    .with_store_error("Could not remove directory recursively")?;
+            }
+        }
+        self.store.tree.remove_node(self.node_id, RemoveBehavior::DropChildren)
+            .expect("Could not remove password from internal tree structure");
+
+        let root = self.store.location().to_owned();
+        if let Some(git) = self.store.git() {
+            git.add(&[&path]).with_store_error("failed to add removal to git")?;
+            git.commit(&format!(
+                "Remove {} from store.",
+                path.strip_prefix(root).unwrap().with_extension("").display(),
+            )).with_store_error("failed to commit removal to git")?;
+        }
+
+        Ok(())
     }
 
-    pub fn rename<N: Into<String>>(&mut self, _name: N) {
-        todo!();
+    pub fn rename<N: Into<String>>(&mut self, name: N) -> Result<(), StoreError> {
+        self.to_entry().rename(name)
     }
 
-    pub fn move_to(&mut self, _directory: &Directory) {
-        todo!();
+    pub fn move_to(&mut self, directory: &Directory) {
+        self.to_entry().move_to(directory)
     }
 
-    pub fn copy_to(&mut self, _directory: &Directory) {
-        todo!();
+    pub fn copy_to(&mut self, directory: &Directory) {
+        self.to_entry().copy_to(directory)
     }
 }

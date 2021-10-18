@@ -60,6 +60,12 @@ pub enum IncrementalWorld {
         path: PathBuf,
         envs: HashMap<String, String>,
     },
+    RenamedPassword {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        password: Password,
+        envs: HashMap<String, String>,
+    },
 }
 
 #[async_trait(?Send)]
