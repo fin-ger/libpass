@@ -364,7 +364,7 @@ impl Store {
     }
 
     pub fn insert_password(&mut self, inserter: &PasswordInserter) -> Result<Password, StoreError> {
-        DecryptedPassword::create_and_write(inserter.lines.clone(), &self.path.join(&inserter.path))?;
+        DecryptedPassword::create_and_write(inserter.lines.clone(), &self.path.join(&inserter.path), inserter.changes.clone(), self)?;
 
         Ok(self.insert_password_into_tree(
             inserter.name.clone(),
@@ -382,6 +382,8 @@ impl Store {
             inserter.passphrase.clone(),
             inserter.lines.clone(),
             &inserter.path,
+            inserter.changes.clone(),
+            self,
         )?;
 
         Ok(self.insert_password_into_tree(

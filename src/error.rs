@@ -3,6 +3,9 @@ use std::{env, io, path::PathBuf};
 use tempfile::PersistError;
 use thiserror::Error;
 
+#[cfg(feature = "parsed-passwords")]
+use crate::Position;
+
 pub struct StoreErrors<'a> {
     iter: std::slice::Iter<'a, StoreError>,
 }

@@ -3,7 +3,7 @@ use pass::{StoreBuilder, TraversalOrder};
 use rand::seq::SliceRandom;
 
 fn main() -> Result<()> {
-    let store = StoreBuilder::default().open()?;
+    let mut store = StoreBuilder::default().open()?;
     assert!(!store.has_errors());
     let mut root_password = store
         .show(
@@ -16,7 +16,7 @@ fn main() -> Result<()> {
         .context("Entry is not a password")?
         .decrypt()?;
     let generated_passphrases = root_password
-        .generator()
+        .generator(&mut store)
         .length(20)
         .numbers(true)
         .lowercase_letters(true)

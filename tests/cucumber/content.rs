@@ -153,7 +153,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
     match world {
         IncrementalWorld::NewPassword { envs, .. } => {
             assert_eq!(stdout.lines().count(), 6, "Not enough commits");
-            assert_eq!(stdout.lines().next().unwrap(), "Add new password");
+            assert_eq!(stdout.lines().next().unwrap(), "Add password for Ready Room.gpg using libpass.");
 
             let output = Command::new("pass")
                 .args(&["show", "Ready Room"])
@@ -168,7 +168,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         }
         IncrementalWorld::EditedPassword { envs, .. } => {
             assert_eq!(stdout.lines().count(), 6, "Not enough commits");
-            assert_eq!(stdout.lines().next().unwrap(), "Edit Sokor password");
+            assert_eq!(stdout.lines().next().unwrap(), "Edit password for Manufacturers/Sokor.gpg using libpass.");
 
             let output = Command::new("pass")
                 .args(&["show", "Manufacturers/Sokor"])
@@ -311,7 +311,7 @@ fn a_password_is_edited(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Successful { store, home, envs } = prev {
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
         let password = store.show("Manufacturers/Sokor", TraversalOrder::LevelOrder)
             .expect("could not find Sokor password")
             .next()
@@ -321,7 +321,7 @@ fn a_password_is_edited(world: &mut IncrementalWorld) {
         password
             .decrypt()
             .expect("Could not decrypt Sokor")
-            .append_line("Note: Picard already knows...")
+            .append_line(&mut store, "Note: Picard already knows...")
             .expect("Failed to append line to Sokor");
 
         *world = IncrementalWorld::EditedPassword { store, home, envs, password };

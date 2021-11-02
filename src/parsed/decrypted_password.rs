@@ -1,14 +1,11 @@
-use gpgme::{Context, Protocol};
 use pest::Parser;
 use pest_derive::Parser;
 use std::{
     fmt,
-    fs::OpenOptions,
-    io::Write,
     path::{Path, PathBuf},
 };
 
-use crate::{search_gpg_ids, IntoStoreError, Position, StoreError};
+use crate::{Position, Store, StoreError, pw_name, save_password_to_file};
 
 #[cfg(feature = "passphrase-utils")]
 use crate::passphrase_utils::{AnalyzedPassphrase, PassphraseGenerator};
@@ -35,6 +32,7 @@ impl fmt::Display for PasswordLine {
 pub struct DecryptedPassword {
     passphrase: Option<String>,
     lines: Vec<PasswordLine>,
+    changes: Vec<String>,
     path: PathBuf,
 }
 
@@ -51,7 +49,7 @@ impl fmt::Display for DecryptedPassword {
 }
 
 impl DecryptedPassword {
-    pub(crate) fn from_lines(lines: Vec<String>, path: PathBuf) -> Result<Self, StoreError> {
+    pub(crate) fn from_lines(lines: Vec<String>, changes: Vec<String>, path: PathBuf) -> Result<Self, StoreError> {
         let content = lines.join("\n");
         let content = PasswordParser::parse(Rule::content, &content)
             .map_err(|err| StoreError::Parse(path.display().to_string(), Box::new(err)))?
@@ -92,6 +90,7 @@ impl DecryptedPassword {
         Ok(Self {
             passphrase,
             lines,
+            changes,
             path: path.to_owned(),
         })
     }
@@ -100,45 +99,41 @@ impl DecryptedPassword {
         passphrase: Option<String>,
         lines: Vec<PasswordLine>,
         path: &Path,
+        changes: Vec<String>,
+        store: &mut Store,
     ) -> Result<Self, StoreError> {
-        let me = Self {
+        let mut me = Self {
             passphrase,
             lines,
+            changes,
             path: path.to_owned(),
         };
-        me.save()?;
+        me.save(Some(format!(
+            "Add password for {} using libpass.",
+            pw_name(path, store),
+        )), store)?;
         Ok(me)
     }
 
-    fn save(&self) -> Result<(), StoreError> {
-        let mut f = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&self.path)
-            .with_store_error(self.path.display().to_string())?;
-        let mut ctx = Context::from_protocol(Protocol::OpenPgp)
-            .with_store_error("creating OpenPGP context")?;
-        let content = format!("{}", self);
-        let mut encrypted = Vec::new();
-        let gpg_ids = search_gpg_ids(&self.path, &mut ctx);
-        let result = ctx.encrypt(gpg_ids.iter(), content, &mut encrypted)
-            .with_store_error(self.path.display().to_string())?;
-        if result.invalid_recipients().count() > 0 {
-            return Err(StoreError::Gpg("Could not encrypt for all gpg-id's".to_owned(), gpgme::Error::BAD_PUBKEY));
-        }
-        if encrypted.len() <= 0 {
-            return Err(StoreError::Gpg(format!("Could not encrypt {}", self.path.display().to_string()), gpgme::Error::NOT_ENCRYPTED));
-        }
-
-        f.write_all(&encrypted)
-            .with_store_error(self.path.display().to_string())?;
-        f.flush().with_store_error(self.path.display().to_string())
+    fn save(&mut self, summary: Option<String>, store: &mut Store) -> Result<(), StoreError> {
+        let changes = std::mem::replace(&mut self.changes, Vec::new());
+        save_password_to_file(store, &self.path, &self, summary, changes)?;
+        Ok(())
     }
 
     #[cfg(feature = "passphrase-utils")]
-    pub fn generator(&mut self) -> PassphraseGenerator<()> {
-        PassphraseGenerator::new(move |passphrase| self.set_passphrase(passphrase))
+    pub fn generator<'a>(&'a mut self, store: &'a mut Store) -> PassphraseGenerator<'a, ()> {
+        PassphraseGenerator::new(move |passphrase| {
+            self.changes.push("Set generated passphrase for password".into());
+            let old_passphrase = self.passphrase.replace(passphrase.into());
+            match self.save(None, store) {
+                Ok(()) => Ok(()),
+                Err(err) => {
+                    self.passphrase = old_passphrase;
+                    Err(err)
+                }
+            }
+        })
     }
 
     #[cfg(feature = "passphrase-utils")]
@@ -148,15 +143,17 @@ impl DecryptedPassword {
         Some(AnalyzedPassphrase::new(passphrase))
     }
 
-    pub fn batch_edit(&mut self) -> DecryptedPasswordBatchEdit {
+    pub fn batch_edit<'a>(&'a mut self, store: &'a mut Store) -> DecryptedPasswordBatchEdit<'a> {
         DecryptedPasswordBatchEdit::new(
             self.passphrase.clone(),
             self.lines.clone(),
-            move |passphrase, lines| {
+            self.changes.clone(),
+            move |passphrase, lines, changes| {
+                self.changes = changes;
                 let old_passphrase = std::mem::replace(&mut self.passphrase, passphrase);
                 let old_lines = std::mem::replace(&mut self.lines, lines);
 
-                match self.save() {
+                match self.save(None, store) {
                     Ok(()) => Ok(()),
                     Err(err) => {
                         self.passphrase = old_passphrase;
@@ -172,9 +169,10 @@ impl DecryptedPassword {
         self.passphrase.as_ref().map(|p| p.as_str())
     }
 
-    pub fn set_passphrase<P: Into<String>>(&mut self, passphrase: P) -> Result<(), StoreError> {
+    pub fn set_passphrase<P: Into<String>>(&mut self, store: &mut Store, passphrase: P) -> Result<(), StoreError> {
+        self.changes.push("Set given passphrase for password".into());
         let old_passphrase = self.passphrase.replace(passphrase.into());
-        match self.save() {
+        match self.save(None, store) {
             Ok(()) => Ok(()),
             Err(err) => {
                 self.passphrase = old_passphrase;
@@ -189,11 +187,17 @@ impl DecryptedPassword {
             .enumerate()
     }
 
-    pub fn insert_line(&mut self, position: Position, line: PasswordLine) -> Result<(), StoreError> {
+    pub fn insert_line(&mut self, store: &mut Store, position: Position, line: PasswordLine) -> Result<(), StoreError> {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Add comment to password".into(),
+            PasswordLine::Entry(key, _) => format!("Add {} entry to password", key),
+        };
+        self.changes.push(message);
+
         let old_lines = self.lines.clone();
         self.lines.insert(position, line);
 
-        match self.save() {
+        match self.save(None, store) {
             Ok(()) => Ok(()),
             Err(err) => {
                 self.lines = old_lines;
@@ -202,7 +206,13 @@ impl DecryptedPassword {
         }
     }
 
-    pub fn replace_line(&mut self, position: Position, line: PasswordLine) -> Result<(), StoreError> {
+    pub fn replace_line(&mut self, store: &mut Store, position: Position, line: PasswordLine) -> Result<(), StoreError> {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Replace comment in password".into(),
+            PasswordLine::Entry(key, _) => format!("Replace {} entry in password", key),
+        };
+        self.changes.push(message);
+
         let old_lines = self.lines.clone();
         if let Some(old_line) = self.lines.get_mut(position) {
             *old_line = line;
@@ -210,7 +220,7 @@ impl DecryptedPassword {
             self.lines.push(line);
         }
 
-        match self.save() {
+        match self.save(None, store) {
             Ok(()) => Ok(()),
             Err(err) => {
                 self.lines = old_lines;
@@ -219,11 +229,17 @@ impl DecryptedPassword {
         }
     }
 
-    pub fn remove_line(&mut self, position: Position) -> Result<(), StoreError> {
+    pub fn remove_line(&mut self, store: &mut Store, position: Position) -> Result<(), StoreError> {
         let old_lines = self.lines.clone();
-        self.lines.remove(position);
+        let old_line = self.lines.remove(position);
 
-        match self.save() {
+        let message = match &old_line {
+            PasswordLine::Comment(_) => "Remove comment from password".into(),
+            PasswordLine::Entry(key, _) => format!("Remove {} entry from password", key),
+        };
+        self.changes.push(message);
+
+        match self.save(None, store) {
             Ok(()) => Ok(()),
             Err(err) => {
                 self.lines = old_lines;
@@ -232,11 +248,17 @@ impl DecryptedPassword {
         }
     }
 
-    pub fn append_line(&mut self, line: PasswordLine) -> Result<(), StoreError> {
+    pub fn append_line(&mut self, store: &mut Store, line: PasswordLine) -> Result<(), StoreError> {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Add comment to password".into(),
+            PasswordLine::Entry(key, _) => format!("Add {} entry to password", key),
+        };
+        self.changes.push(message);
+
         let old_lines = self.lines.clone();
         self.lines.push(line);
 
-        match self.save() {
+        match self.save(None, store) {
             Ok(()) => Ok(()),
             Err(err) => {
                 self.lines = old_lines;
@@ -245,11 +267,17 @@ impl DecryptedPassword {
         }
     }
 
-    pub fn prepend_line(&mut self, line: PasswordLine) -> Result<(), StoreError> {
+    pub fn prepend_line(&mut self, store: &mut Store, line: PasswordLine) -> Result<(), StoreError> {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Add comment to password".into(),
+            PasswordLine::Entry(key, _) => format!("Add {} entry to password", key),
+        };
+        self.changes.push(message);
+
         let old_lines = self.lines.clone();
         self.lines.insert(0, line);
 
-        match self.save() {
+        match self.save(None, store) {
             Ok(()) => Ok(()),
             Err(err) => {
                 self.lines = old_lines;
@@ -258,10 +286,10 @@ impl DecryptedPassword {
         }
     }
 
-    pub fn set_lines(&mut self, lines: Vec<PasswordLine>) -> Result<(), StoreError> {
+    pub fn set_lines(&mut self, store: &mut Store, lines: Vec<PasswordLine>) -> Result<(), StoreError> {
         let old_lines = std::mem::replace(&mut self.lines, lines);
 
-        match self.save() {
+        match self.save(None, store) {
             Ok(()) => Ok(()),
             Err(err) => {
                 self.lines = old_lines;
@@ -284,32 +312,33 @@ impl DecryptedPassword {
 
     pub fn insert_comment<C: Into<String>>(
         &mut self,
+        store: &mut Store,
         position: Position,
         comment: C,
     ) -> Result<(), StoreError> {
-        self.insert_line(position, PasswordLine::Comment(comment.into()))
+        self.insert_line(store, position, PasswordLine::Comment(comment.into()))
     }
 
-    pub fn replace_comment<C: Into<String>>(&mut self, position: Position, comment: C) -> Result<(), StoreError> {
+    pub fn replace_comment<C: Into<String>>(&mut self, store: &mut Store, position: Position, comment: C) -> Result<(), StoreError> {
         if let Some(PasswordLine::Entry(..)) = self.lines.get(position) {
             return Err(StoreError::PasswordLineNotAComment(position));
         }
-        self.replace_line(position, PasswordLine::Comment(comment.into()))
+        self.replace_line(store, position, PasswordLine::Comment(comment.into()))
     }
 
-    pub fn remove_comment(&mut self, position: Position) -> Result<(), StoreError> {
+    pub fn remove_comment(&mut self, store: &mut Store, position: Position) -> Result<(), StoreError> {
         if let Some(PasswordLine::Entry(..)) = self.lines.get(position) {
             return Err(StoreError::PasswordLineNotAComment(position));
         }
-        self.remove_line(position)
+        self.remove_line(store, position)
     }
 
-    pub fn prepend_comment<C: Into<String>>(&mut self, comment: C) -> Result<(), StoreError> {
-        self.prepend_line(PasswordLine::Comment(comment.into()))
+    pub fn prepend_comment<C: Into<String>>(&mut self, store: &mut Store, comment: C) -> Result<(), StoreError> {
+        self.prepend_line(store, PasswordLine::Comment(comment.into()))
     }
 
-    pub fn append_comment<C: Into<String>>(&mut self, comment: C) -> Result<(), StoreError> {
-        self.append_line(PasswordLine::Comment(comment.into()))
+    pub fn append_comment<C: Into<String>>(&mut self, store: &mut Store, comment: C) -> Result<(), StoreError> {
+        self.append_line(store, PasswordLine::Comment(comment.into()))
     }
 
     pub fn all_entries(&self) -> impl Iterator<Item = (Position, (&str, &str))> {
@@ -339,15 +368,17 @@ impl DecryptedPassword {
 
     pub fn insert_entry<K: Into<String>, V: Into<String>>(
         &mut self,
+        store: &mut Store,
         position: Position,
         key: K,
         value: V,
     ) -> Result<(), StoreError> {
-        self.insert_line(position, PasswordLine::Entry(key.into(), value.into()))
+        self.insert_line(store, position, PasswordLine::Entry(key.into(), value.into()))
     }
 
     pub fn replace_entry<K: Into<String>, V: Into<String>>(
         &mut self,
+        store: &mut Store,
         position: Position,
         key: K,
         value: V,
@@ -355,41 +386,45 @@ impl DecryptedPassword {
         if let Some(PasswordLine::Comment(..)) = self.lines.get(position) {
             return Err(StoreError::PasswordLineNotAnEntry(position));
         }
-        self.replace_line(position, PasswordLine::Entry(key.into(), value.into()))
+        self.replace_line(store, position, PasswordLine::Entry(key.into(), value.into()))
     }
 
-    pub fn remove_entry(&mut self, position: Position) -> Result<(), StoreError> {
+    pub fn remove_entry(&mut self, store: &mut Store, position: Position) -> Result<(), StoreError> {
         if let Some(PasswordLine::Comment(..)) = self.lines.get(position) {
             return Err(StoreError::PasswordLineNotAnEntry(position));
         }
-        self.remove_line(position)
+        self.remove_line(store, position)
     }
 
     pub fn prepend_entry<K: Into<String>, V: Into<String>>(
         &mut self,
+        store: &mut Store,
         key: K,
         value: V,
     ) -> Result<(), StoreError> {
-        self.prepend_line(PasswordLine::Entry(key.into(), value.into()))
+        self.prepend_line(store, PasswordLine::Entry(key.into(), value.into()))
     }
 
     pub fn append_entry<K: Into<String>, V: Into<String>>(
         &mut self,
+        store: &mut Store,
         key: K,
         value: V,
     ) -> Result<(), StoreError> {
-        self.append_line(PasswordLine::Entry(key.into(), value.into()))
+        self.append_line(store, PasswordLine::Entry(key.into(), value.into()))
     }
 }
 
 pub struct DecryptedPasswordBatchEdit<'a> {
     passphrase: Option<String>,
     lines: Vec<PasswordLine>,
+    changes: Vec<String>,
     batch_handler: Box<
         dyn 'a
             + FnOnce(
                 Option<String>,
                 Vec<PasswordLine>,
+                Vec<String>,
             ) -> Result<(), StoreError>,
     >,
 }
@@ -400,20 +435,24 @@ impl<'a> DecryptedPasswordBatchEdit<'a> {
             + FnOnce(
                 Option<String>,
                 Vec<PasswordLine>,
+                Vec<String>,
             ) -> Result<(), StoreError>,
     >(
         passphrase: Option<String>,
         lines: Vec<PasswordLine>,
+        changes: Vec<String>,
         batch_handler: F,
     ) -> Self {
         Self {
             passphrase,
             lines,
+            changes,
             batch_handler: Box::new(batch_handler),
         }
     }
 
     pub fn passphrase<P: Into<String>>(mut self, passphrase: P) -> Self {
+        self.changes.push("Set given passphrase for password".into());
         self.passphrase = Some(passphrase.into());
         self
     }
@@ -424,11 +463,23 @@ impl<'a> DecryptedPasswordBatchEdit<'a> {
     }
 
     pub fn insert_line(mut self, position: Position, line: PasswordLine) -> Self {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Add comment to password".into(),
+            PasswordLine::Entry(key, _) => format!("Add {} entry to password", key),
+        };
+        self.changes.push(message);
+
         self.lines.insert(position, line);
         self
     }
 
     pub fn replace_line(mut self, position: Position, line: PasswordLine) -> Self {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Replace comment in password".into(),
+            PasswordLine::Entry(key, _) => format!("Replace {} entry in password", key),
+        };
+        self.changes.push(message);
+
         if let Some(old_line) = self.lines.get_mut(position) {
             *old_line = line;
         } else {
@@ -439,16 +490,35 @@ impl<'a> DecryptedPasswordBatchEdit<'a> {
     }
 
     pub fn remove_line(mut self, position: Position) -> Self {
-        self.lines.remove(position);
+        let old_line = self.lines.remove(position);
+
+        let message = match &old_line {
+            PasswordLine::Comment(_) => "Remove comment from password".into(),
+            PasswordLine::Entry(key, _) => format!("Remove {} entry from password", key),
+        };
+        self.changes.push(message);
+
         self
     }
 
     pub fn append_line(mut self, line: PasswordLine) -> Self {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Add comment to password".into(),
+            PasswordLine::Entry(key, _) => format!("Add {} entry to password", key),
+        };
+        self.changes.push(message);
+
         self.lines.push(line);
         self
     }
 
     pub fn prepend_line(mut self, line: PasswordLine) -> Self {
+        let message = match &line {
+            PasswordLine::Comment(_) => "Add comment to password".into(),
+            PasswordLine::Entry(key, _) => format!("Add {} entry to password", key),
+        };
+        self.changes.push(message);
+
         self.lines.insert(0, line);
         self
     }
@@ -459,14 +529,14 @@ impl<'a> DecryptedPasswordBatchEdit<'a> {
 
     pub fn replace_comment<C: Into<String>>(self, position: Position, comment: C) -> Self {
         if let Some(PasswordLine::Entry(..)) = self.lines.get(position) {
-            panic!(format!("Line at position {0} is not a comment!", position));
+            panic!("Line at position {0} is not a comment!", position);
         }
         self.replace_line(position, PasswordLine::Comment(comment.into()))
     }
 
     pub fn remove_comment(self, position: Position) -> Self {
         if let Some(PasswordLine::Entry(..)) = self.lines.get(position) {
-            panic!(format!("Line at position {0} is not a comment!", position));
+            panic!("Line at position {0} is not a comment!", position);
         }
         self.remove_line(position)
     }
@@ -485,14 +555,14 @@ impl<'a> DecryptedPasswordBatchEdit<'a> {
 
     pub fn replace_entry<K: Into<String>, V: Into<String>>(self, position: Position, key: K, value: V) -> Self {
         if let Some(PasswordLine::Comment(..)) = self.lines.get(position) {
-            panic!(format!("Line at position {0} is not an entry!", position));
+            panic!("Line at position {0} is not an entry!", position);
         }
         self.replace_line(position, PasswordLine::Entry(key.into(), value.into()))
     }
 
     pub fn remove_entry(self, position: Position) -> Self {
         if let Some(PasswordLine::Comment(..)) = self.lines.get(position) {
-            panic!(format!("Line at position {0} is not an entry!", position));
+            panic!("Line at position {0} is not an entry!", position);
         }
         self.remove_line(position)
     }
@@ -506,6 +576,6 @@ impl<'a> DecryptedPasswordBatchEdit<'a> {
     }
 
     pub fn edit(self) -> Result<(), StoreError> {
-        (self.batch_handler)(self.passphrase, self.lines)
+        (self.batch_handler)(self.passphrase, self.lines, self.changes)
     }
 }

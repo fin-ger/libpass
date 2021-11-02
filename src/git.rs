@@ -47,7 +47,7 @@ impl Git {
         Ok(GitStatus)
     }
 
-    pub(crate) fn commit(&mut self, message: &str) -> GitResult<()> {
+    pub(crate) fn commit<M: Into<String>>(&mut self, message: M) -> GitResult<()> {
         let me = self.repo.signature()?;
         let tree_id = self.repo.index()?.write_tree()?;
         let tree = self.repo.find_tree(tree_id)?;
@@ -65,7 +65,7 @@ impl Git {
             Some("HEAD"),
             &me,
             &me,
-            message,
+            &message.into(),
             &tree,
             &parents,
         )?;
