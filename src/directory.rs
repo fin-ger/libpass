@@ -5,6 +5,7 @@ use std::{fs::{self, OpenOptions}, io::Read, path::{Path, PathBuf}};
 
 use crate::{DirectoryInserter, IntoStoreError, MutEntry, Traversal, PassNode, PasswordInserter, Store, StoreError};
 
+#[derive(Debug)]
 pub struct Directory {
     name: String,
     path: PathBuf,
@@ -22,7 +23,7 @@ impl Directory {
         }
     }
 
-    pub fn password_insertion<N: Into<String>>(&mut self, name: N) -> PasswordInserter {
+    pub fn password_insertion<N: Into<String>>(&self, name: N) -> PasswordInserter {
         let name = name.into();
         let path = self.path.join(format!("{}.gpg", name));
         PasswordInserter::new(self.node_id.clone(), path, name)
@@ -38,7 +39,7 @@ impl Directory {
         crate::parsed::PasswordInserter::new(self.node_id.clone(), path, name)
     }
 
-    pub fn directory_insertion<N: Into<String>>(&mut self, name: N) -> DirectoryInserter {
+    pub fn directory_insertion<N: Into<String>>(&self, name: N) -> DirectoryInserter {
         let name = name.into();
         let path = self.path.join(&name);
         DirectoryInserter::new(self.node_id.clone(), path, name)
@@ -219,5 +220,9 @@ impl<'a> MutDirectory<'a> {
 
     pub fn copy_to(&mut self, directory: &Directory) {
         self.to_entry().copy_to(directory)
+    }
+
+    pub fn make_immut(self) -> Directory {
+        Directory::new(self.name().into(), self.path().into(), self.store.location().into(), self.node_id)
     }
 }

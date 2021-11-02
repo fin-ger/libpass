@@ -147,7 +147,7 @@ impl<'a> MutEntry<'a> {
         if let Some(git) = self.store.git() {
             git.add(&[&old_path, &new_path]).with_store_error("failed to add rename to git")?;
             git.commit(&format!(
-                "Rename {} to {}.",
+                "Rename '{}' to '{}'.",
                 old_path.strip_prefix(&root).unwrap().with_extension("").display(),
                 new_path.strip_prefix(&root).unwrap().with_extension("").display(),
             )).with_store_error("failed to commit rename to git")?;

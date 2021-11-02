@@ -15,6 +15,7 @@ use crate::passphrase_utils::{AnalyzedPassphrase, PassphraseGenerator};
 pub(crate) fn pw_name(path: &Path, store: &Store) -> String {
     path.strip_prefix(store.location())
         .expect("Password not stored inside this password store!")
+        .with_extension("")
         .display()
         .to_string()
 }
@@ -77,7 +78,7 @@ pub(crate) fn save_password_to_file(store: &mut Store, path: &Path, password: im
             message
         } else {
             format!(
-                "Edit password for {} using libpass.",
+                "Edit password for '{}' using libpass.",
                 pw_name,
             )
         };
@@ -141,7 +142,7 @@ impl DecryptedPassword {
             changes,
         };
         me.save(Some(format!(
-            "Add password for {} using libpass.",
+            "Add password for '{}' using libpass.",
             pw_name(path, store),
         )), store)?;
         Ok(me)

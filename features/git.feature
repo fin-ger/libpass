@@ -35,12 +35,13 @@ Feature: Git operations in the password store
     And a password is renamed
     Then the repository is clean and contains a new commit
 
-  Scenario: Commit a new directory
+  Scenario: Commit a password in a new directory
     Given a password store exists
     And the password store uses git
     And a password store is opened
     When the password store is successfully opened
     And a directory is created
+    And a password is created in the new directory
     Then the repository is clean and contains a new commit
 
   Scenario: Commit a renamed directory

@@ -133,7 +133,7 @@ impl<'a> MutPassword<'a> {
         if let Some(git) = self.store.git() {
             git.add(&[&path]).with_store_error("failed to add removal to git")?;
             git.commit(&format!(
-                "Remove {} from store.",
+                "Remove '{}' from store.",
                 path.strip_prefix(root).unwrap().with_extension("").display(),
             )).with_store_error("failed to commit removal to git")?;
         }

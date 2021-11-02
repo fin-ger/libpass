@@ -128,6 +128,8 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         IncrementalWorld::EditedPassword { envs, .. } => envs,
         IncrementalWorld::RemovedPassword { envs, .. } => envs,
         IncrementalWorld::RenamedPassword { envs, .. } => envs,
+        IncrementalWorld::NewPasswordAndDirectory { envs, .. } => envs,
+        IncrementalWorld::RenamedDirectory { envs, .. } => envs,
         _ => panic!("World state is invalid!"),
     };
 
@@ -153,7 +155,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
     match world {
         IncrementalWorld::NewPassword { envs, .. } => {
             assert_eq!(stdout.lines().count(), 6, "Not enough commits");
-            assert_eq!(stdout.lines().next().unwrap(), "Add password for Ready Room.gpg using libpass.");
+            assert_eq!(stdout.lines().next().unwrap(), "Add password for 'Ready Room' using libpass.");
 
             let output = Command::new("pass")
                 .args(&["show", "Ready Room"])
@@ -168,7 +170,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         }
         IncrementalWorld::EditedPassword { envs, .. } => {
             assert_eq!(stdout.lines().count(), 6, "Not enough commits");
-            assert_eq!(stdout.lines().next().unwrap(), "Edit password for Manufacturers/Sokor.gpg using libpass.");
+            assert_eq!(stdout.lines().next().unwrap(), "Edit password for 'Manufacturers/Sokor' using libpass.");
 
             let output = Command::new("pass")
                 .args(&["show", "Manufacturers/Sokor"])
@@ -183,7 +185,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         }
         IncrementalWorld::RemovedPassword { envs, .. } => {
             assert_eq!(stdout.lines().count(), 6, "Not enough commits");
-            assert_eq!(stdout.lines().next().unwrap(), "Remove Manufacturers/Sokor from store.");
+            assert_eq!(stdout.lines().next().unwrap(), "Remove 'Manufacturers/Sokor' from store.");
 
             let status = Command::new("pass")
                 .args(&["show", "Manufacturers/Sokor"])
@@ -196,7 +198,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         }
         IncrementalWorld::RenamedPassword { envs, .. } => {
             assert_eq!(stdout.lines().count(), 6, "Not enough commits");
-            assert_eq!(stdout.lines().next().unwrap(), "Rename Manufacturers/Sokor to Manufacturers/None of your concern.");
+            assert_eq!(stdout.lines().next().unwrap(), "Rename 'Manufacturers/Sokor' to 'Manufacturers/None of your concern'.");
 
             let status = Command::new("pass")
                 .args(&["show", "Manufacturers/None of your concern"])
@@ -206,6 +208,34 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
                 .expect("Could not read Sokor password content");
 
             assert!(status.success(), "Sokor password has not been renamed!");
+        }
+        IncrementalWorld::NewPasswordAndDirectory { envs, .. } => {
+            assert_eq!(stdout.lines().count(), 1, "Not enough commits");
+            assert_eq!(stdout.lines().next().unwrap(), "Add password for 'Warp Nacelles/Starfleet' using libpass.");
+
+            let output = Command::new("pass")
+                .args(&["show", "Warp Nacelles/Starfleet"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .output()
+                .expect("Could not read Warp Nacelles/Starfleet password content");
+            let pw_content = String::from_utf8(output.stdout)
+                .expect("Cloud not read stdout as UTF-8");
+
+            assert_eq!(pw_content, "two-nacelles-ftw\n");
+        }
+        IncrementalWorld::RenamedDirectory { envs, .. } => {
+            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().next().unwrap(), "Rename 'Entertainment/Holo Deck' to 'Entertainment/Novels'.");
+
+            let status = Command::new("pass")
+                .args(&["show", "Entertainment/Novels"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .status()
+                .expect("Could not read Novels directory content");
+
+            assert!(status.success(), "Novels directory has not been renamed!");
         }
         _ => unreachable!(),
     };
@@ -288,7 +318,7 @@ fn a_new_password_is_created(world: &mut IncrementalWorld) {
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
     if let IncrementalWorld::Successful { mut store, home, envs } = prev {
-        let mut root = store.show("./", TraversalOrder::LevelOrder)
+        let root = store.show("./", TraversalOrder::LevelOrder)
             .expect("could not get root directory of password store")
             .next()
             .expect("could not get root directory of password store")
@@ -373,6 +403,73 @@ fn a_password_is_renamed(world: &mut IncrementalWorld) {
         let password = password.make_immut();
 
         *world = IncrementalWorld::RenamedPassword { store, home, envs, password };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a directory is created")]
+fn a_directory_is_created(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { ref mut store, .. } = world {
+        let root = store.show(".", TraversalOrder::LevelOrder)
+            .expect("could not find root directory")
+            .next()
+            .expect("could not find root directory")
+            .directory()
+            .expect("Root is not a directory");
+
+        root
+            .directory_insertion("Warp Nacelles")
+            .insert(store)
+            .expect("Could not create Wrap Nacelles directory");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a password is created in the new directory")]
+fn a_password_is_created_in_the_new_directory(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        let warp_nacelles = store.show("./Warp Nacelles", TraversalOrder::LevelOrder)
+            .expect("could not get root directory of password store")
+            .next()
+            .expect("could not get root directory of password store")
+            .directory()
+            .expect("Root directory is not a directory");
+
+        let password = warp_nacelles.password_insertion("Starfleet")
+            .passphrase("two-nacelles-ftw")
+            .insert(&mut store)
+            .expect("Password insertion failed");
+
+        *world = IncrementalWorld::NewPasswordAndDirectory { store, home, envs, password };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a directory is renamed")]
+fn a_directory_is_renamed(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        let mut holo_deck = store.show("Entertainment/Holo Deck", TraversalOrder::LevelOrder)
+            .expect("could not find Entertainment/Holo Deck directory")
+            .next()
+            .expect("could not find Entertainment/Holo Deck directory")
+            .directory()
+            .expect("Holo Deck is not a directory")
+            .make_mut(&mut store);
+        holo_deck
+            .rename("Novels")
+            .expect("Could not rename directory");
+        let directory = holo_deck.make_immut();
+
+        *world = IncrementalWorld::RenamedDirectory { store, home, envs, directory };
     } else {
         panic!("World state is not Successful!");
     }

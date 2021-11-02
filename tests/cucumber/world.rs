@@ -6,7 +6,7 @@ use std::{convert::Infallible, path::PathBuf};
 use anyhow::Context as AnyhowContext;
 use async_trait::async_trait;
 use cucumber::{World, WorldInit};
-use pass::{DecryptedPassword, Store, StoreBuilder, StoreError, Password};
+use pass::{DecryptedPassword, Directory, Password, Store, StoreBuilder, StoreError};
 use tempdir::TempDir;
 
 #[derive(Debug, WorldInit)]
@@ -64,6 +64,18 @@ pub enum IncrementalWorld {
         home: TempDir,
         store: AssertUnwindSafe<Store>,
         password: Password,
+        envs: HashMap<String, String>,
+    },
+    NewPasswordAndDirectory {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        password: Password,
+        envs: HashMap<String, String>,
+    },
+    RenamedDirectory {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        directory: Directory,
         envs: HashMap<String, String>,
     },
 }

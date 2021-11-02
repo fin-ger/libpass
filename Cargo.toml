@@ -5,7 +5,7 @@ authors = ["Fin Christensen <christensen.fin@gmail.com>"]
 edition = "2018"
 
 [features]
-default = ["parsed-passwords", "passphrase-utils"]
+default = ["passphrase-utils"]
 
 parsed-passwords = ["pest", "pest_derive"]
 passphrase-utils = ["passwords"]
