@@ -2,7 +2,8 @@ use std::panic::AssertUnwindSafe;
 use std::process::{Command, Stdio};
 
 use cucumber::{then, when};
-use pass::TraversalOrder;
+use pass::GitRemote;
+use pass::{Traversal, TraversalOrder};
 
 use crate::world::IncrementalWorld;
 use crate::{DIR, PW};
@@ -130,6 +131,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
         IncrementalWorld::RenamedPassword { envs, .. } => envs,
         IncrementalWorld::NewPasswordAndDirectory { envs, .. } => envs,
         IncrementalWorld::RenamedDirectory { envs, .. } => envs,
+        IncrementalWorld::RemovedDirectory { envs, .. } => envs,
         _ => panic!("World state is invalid!"),
     };
 
@@ -237,8 +239,91 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
 
             assert!(status.success(), "Novels directory has not been renamed!");
         }
+        IncrementalWorld::RemovedDirectory { envs, .. } => {
+            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().next().unwrap(), "Remove 'Entertainment' from store.");
+
+            let status = Command::new("pass")
+                .args(&["show", "Entertainment"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .status()
+                .expect("Could not read Entertainment directory content");
+
+            assert!(!status.success(), "Entertainment directory has not been removed!");
+        }
         _ => unreachable!(),
     };
+}
+
+#[then("the repository is clean")]
+fn the_repository_is_clean(world: &mut IncrementalWorld) {
+    let envs = match world {
+        IncrementalWorld::Successful { envs, .. } => envs,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let output = Command::new("pass")
+        .args(&["git", "status", "--porcelain"])
+        .envs(envs.clone())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Could not check git state");
+    let stdout = String::from_utf8(output.stdout)
+        .expect("Could not read stdout as UTF-8");
+    assert_eq!(stdout, "", "Repository is not clean!");
+}
+
+#[then("pushing the commit succeeds")]
+fn pushing_the_commit_succeeds(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Pushed { result, envs, .. } = prev {
+        result.expect("Failed to push to remote");
+
+        let output = Command::new("pass")
+            .args(&["git", "log", "origin/master..master"])
+            .envs(envs.clone())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .expect("Could not check git state");
+        let stdout = String::from_utf8(output.stdout)
+            .expect("Could not read stdout as UTF-8");
+        let stderr = String::from_utf8(output.stderr)
+            .expect("Could not read stderr as UTF-8");
+        assert_eq!(stderr, "", "Errors occurred while checking git for pushable commits!");
+        assert_eq!(stdout, "", "Commits are not pushed!");
+    } else {
+        panic!("World state is not Pushed!");
+    }
+}
+
+#[then("pushing the commit fails")]
+fn pushing_the_commit_fails(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Pushed { result, envs, home, .. } = prev {
+        assert!(result.is_err(), "Pushing has not failed, although it should have!");
+
+        let output = Command::new("pass")
+            .args(&["git", "log", "origin/master..master"])
+            .envs(envs.clone())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .expect("Could not check git state");
+        let stdout = String::from_utf8(output.stdout)
+            .expect("Could not read stdout as UTF-8");
+        let stderr = String::from_utf8(output.stderr)
+            .expect("Could not read stderr as UTF-8");
+        assert_eq!(stderr, "", "Errors occurred while checking git for pushable commits!");
+        assert!(!stdout.is_empty(), "Commits are not pushed!");
+    } else {
+        panic!("World state is not Pushed!");
+    }
 }
 
 #[when("a password is opened")]
@@ -312,7 +397,7 @@ fn content_of_a_non_existing_password_is_searched_in_the_password_store(
     }
 }
 
-#[when("a new password is created")]
+#[when(regex = r"^a (\w+ )?password is created$")]
 fn a_new_password_is_created(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
@@ -470,6 +555,46 @@ fn a_directory_is_renamed(world: &mut IncrementalWorld) {
         let directory = holo_deck.make_immut();
 
         *world = IncrementalWorld::RenamedDirectory { store, home, envs, directory };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("a directory is removed")]
+fn a_directory_is_removed(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        let entertainment = store.show("Entertainment", TraversalOrder::LevelOrder)
+            .expect("could not find Entertainment directory")
+            .next()
+            .expect("could not find Entertainment directory")
+            .directory()
+            .expect("Entertainment is not a directory")
+            .make_mut(&mut store);
+        let path = entertainment.path().to_owned();
+        entertainment
+            .remove(Traversal::Recursive)
+            .expect("Could not remove directory");
+
+        *world = IncrementalWorld::RemovedDirectory { store, home, envs, path };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("the commit is pushed to the remote")]
+fn the_commit_is_pushed_to_the_remote(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::NewPassword { mut store, home, envs, .. } = prev {
+        let result = store
+            .git().expect("Store not using git")
+            .push(GitRemote::UpstreamForBranch);
+
+        *world = IncrementalWorld::Pushed { store, home, envs, result };
     } else {
         panic!("World state is not Successful!");
     }

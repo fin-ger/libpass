@@ -70,23 +70,14 @@ Feature: Git operations in the password store
     When the password store is successfully opened
     Then the repository is clean
 
-  Scenario: Query the status of an altered password store
-    Given a password store exists
-    And the password store uses git
-    And passwords are stored in the password store
-    And a password store is opened
-    When the password store is successfully opened
-    And a password is created
-    Then the repository is not clean
-
   Scenario: Push fast-forward commits to the git remote
     Given a password store exists
     And the password store uses git
     And passwords are stored in the password store
+    And the repository has a remote
     And a password store is opened
     When the password store is successfully opened
     And a password is created
-    And the password is committed
     And the commit is pushed to the remote
     Then pushing the commit succeeds
 
@@ -94,11 +85,11 @@ Feature: Git operations in the password store
     Given a password store exists
     And the password store uses git
     And passwords are stored in the password store
+    And the repository has a remote
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened
     And a password is created
-    And the password is committed
     And the commit is pushed to the remote
     Then pushing the commit fails
 
@@ -106,6 +97,7 @@ Feature: Git operations in the password store
     Given a password store exists
     And the password store uses git
     And passwords are stored in the password store
+    And the repository has a remote
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened
@@ -116,11 +108,11 @@ Feature: Git operations in the password store
     Given a password store exists
     And the password store uses git
     And passwords are stored in the password store
+    And the repository has a remote
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened
     And a new password is created
-    And the password is committed
     And changes are pulled from the remote
     Then the repository is clean
 
@@ -128,11 +120,11 @@ Feature: Git operations in the password store
     Given a password store exists
     And the password store uses git
     And passwords are stored in the password store
+    And the repository has a remote
     And the repository's remote contains new commits
     And a password store is opened
     When the password store is successfully opened
     And a password is edited
-    And the password is committed
     And changes are pulled from the remote
     Then the merge conflict can be manually resolved
     And the repository is clean

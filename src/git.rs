@@ -3,8 +3,9 @@ use std::fmt;
 
 use crate::DecryptedPassword;
 
-use git2::{Config, ObjectType, Repository};
+use git2::{Config, IndexAddOption, ObjectType, Repository};
 use custom_debug::Debug;
+use walkdir::WalkDir;
 
 pub struct GitStatus;
 
@@ -16,6 +17,12 @@ fn debug_repository(repo: &Repository, f: &mut fmt::Formatter) -> fmt::Result {
 pub struct Git {
     #[debug(with = "debug_repository")]
     repo: Repository,
+}
+
+#[derive(Debug)]
+pub enum GitRemote {
+    UpstreamForBranch,
+    Manual(String),
 }
 
 type GitResult<T> = Result<T, git2::Error>;
@@ -39,7 +46,22 @@ impl Git {
         Ok(())
     }
 
-    pub fn push(&mut self) -> GitResult<()> {
+    pub fn push(&mut self, remote: GitRemote) -> GitResult<()> {
+        let head = self.repo.head()?;
+        let branch_name = head.name()
+            .expect("Branch name not valid utf-8 🤷");
+        let remote = match remote {
+            GitRemote::UpstreamForBranch => {
+                self.repo.branch_upstream_remote(branch_name)?.as_str()
+                    .expect("Remote name not valid utf-8 🤷")
+                    .to_owned()
+            },
+            GitRemote::Manual(remote) => remote,
+        };
+
+        let mut remote = self.repo.find_remote(&remote)?;
+        remote.push(&[branch_name], None)?;
+
         Ok(())
     }
 
@@ -77,9 +99,24 @@ impl Git {
         for path in paths {
             let relative = path.strip_prefix(workdir).unwrap();
             if path.exists() {
-                self.repo.index()?.add_path(relative)?;
+                if path.is_dir() {
+                    for file in WalkDir::new(path).follow_links(true).into_iter().filter_map(|e| e.ok()) {
+                        let filename = file.file_name().to_string_lossy();
+                        let relative = file.path().strip_prefix(workdir).unwrap();
+
+                        if filename.ends_with(".gpg") || filename == ".gpg-id" {
+                            // forcefully add passwords and gpg-id files
+                            self.repo.index()?.add_path(relative)?;
+                        } else {
+                            // other files are checked against gitignore and such
+                            self.repo.index()?.add_all(&[relative], IndexAddOption::DEFAULT, None)?;
+                        }
+                    }
+                } else {
+                    self.repo.index()?.add_path(relative)?;
+                }
             } else {
-                self.repo.index()?.remove_path(relative)?;
+                self.repo.index()?.remove_all(&[relative], None)?;
             }
         }
         self.repo.index()?.write()?;

@@ -7,7 +7,7 @@ use anyhow::Context as AnyhowContext;
 use async_trait::async_trait;
 use cucumber::{World, WorldInit};
 use pass::{DecryptedPassword, Directory, Password, Store, StoreBuilder, StoreError};
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 #[derive(Debug, WorldInit)]
 pub enum IncrementalWorld {
@@ -78,6 +78,18 @@ pub enum IncrementalWorld {
         directory: Directory,
         envs: HashMap<String, String>,
     },
+    RemovedDirectory {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        path: PathBuf,
+        envs: HashMap<String, String>,
+    },
+    Pushed {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        envs: HashMap<String, String>,
+        result: Result<(), git2::Error>,
+    },
 }
 
 #[async_trait(?Send)]
@@ -104,10 +116,13 @@ impl IncrementalWorld {
         env::remove_var("PASSWORD_STORE_EXTENSIONS_DIR");
         env::remove_var("PASSWORD_STORE_SIGNING_KEY");
 
-        let home = TempDir::new(&format!("libpass-{}", name)).context(format!(
-            "Could not create temporary home folder for {}",
-            name
-        ))?;
+        let home = tempfile::Builder::new()
+            .prefix(&format!("libpass-{}_", name))
+            .tempdir()
+            .context(format!(
+                "Could not create temporary home folder for {}",
+                name
+            ))?;
         env::set_var("HOME", home.path());
         env::set_var(
             "GNUPGHOME",
