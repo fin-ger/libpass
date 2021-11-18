@@ -51,11 +51,31 @@ fn initialize_pgp_home(home: &Path) -> anyhow::Result<()> {
     gpg_agent_conf.write_all("allow-preset-passphrase\n".as_bytes())?;
     gpg_agent_conf.flush()?;
     Command::new("find")
-        .args(&[&format!("{}/.gnupg", home.display()), "-type", "f", "-exec", "chmod", "600", "{}", ";"])
-        .status().unwrap();
+        .args(&[
+            &format!("{}/.gnupg", home.display()),
+            "-type",
+            "f",
+            "-exec",
+            "chmod",
+            "600",
+            "{}",
+            ";",
+        ])
+        .status()
+        .unwrap();
     Command::new("find")
-        .args(&[&format!("{}/.gnupg", home.display()), "-type", "d", "-exec", "chmod", "700", "{}", ";"])
-        .status().unwrap();
+        .args(&[
+            &format!("{}/.gnupg", home.display()),
+            "-type",
+            "d",
+            "-exec",
+            "chmod",
+            "700",
+            "{}",
+            ";",
+        ])
+        .status()
+        .unwrap();
 
     let mut ctx = Context::from_protocol(Protocol::OpenPgp)
         .context("Could not create GPG context")?

@@ -39,10 +39,7 @@ fn a_password_store_exists(world: &mut IncrementalWorld, location: String) {
                 );
             }
             _ => {
-                panic!(
-                    "Invalid location '{}' for password insertion!",
-                    location,
-                );
+                panic!("Invalid location '{}' for password insertion!", location,);
             }
         };
 
@@ -62,16 +59,17 @@ fn a_password_store_exists(world: &mut IncrementalWorld, location: String) {
 
 #[given("the password store uses git")]
 fn the_password_store_uses_git(world: &mut IncrementalWorld) {
-    if let IncrementalWorld::Prepared {
-        envs, ..
-    } = world {
+    if let IncrementalWorld::Prepared { envs, .. } = world {
         let status = Command::new("pass")
             .args(&["git", "init"])
             .envs(envs.clone())
             .stdout(Stdio::null())
             .status()
             .unwrap();
-        assert!(status.success(), "Failed to initialize git in pass repository!");
+        assert!(
+            status.success(),
+            "Failed to initialize git in pass repository!"
+        );
 
         let status = Command::new("pass")
             .args(&["git", "config", "user.name", "Test User"])
@@ -137,7 +135,9 @@ fn passwords_are_stored_in_the_password_store(world: &mut IncrementalWorld) {
             "fun-times1337\nusername: geordi\n",
         );
 
-        let store_path = envs.get("PASSWORD_STORE_DIR").map(|s| s.to_owned())
+        let store_path = envs
+            .get("PASSWORD_STORE_DIR")
+            .map(|s| s.to_owned())
             .unwrap_or(format!("{}", home.path().join(".password-store").display()));
         Command::new("tree")
             .args(&["--noreport", &store_path])
@@ -187,7 +187,10 @@ fn the_repository_has_a_remote(world: &mut IncrementalWorld) {
             .current_dir(&password_store_dir)
             .status()
             .expect("failed to git fetch from remote");
-        assert!(status.success(), "Failed to fetch from the repository's remote");
+        assert!(
+            status.success(),
+            "Failed to fetch from the repository's remote"
+        );
 
         let status = Command::new("git")
             .arg("branch")
@@ -222,7 +225,12 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
         let status = Command::new("git")
             .arg("clone")
             .arg(&password_store_remote)
-            .arg(&password_store_remote_temp_checkout.path().display().to_string())
+            .arg(
+                &password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
             .envs(envs.clone())
             .status()
             .expect("Failed to prepare temporary checkout");
@@ -233,7 +241,10 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
             .envs(envs.clone())
             .env(
                 "PASSWORD_STORE_DIR",
-                password_store_remote_temp_checkout.path().display().to_string(),
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
             )
             .stdout(Stdio::null())
             .status()
@@ -245,7 +256,10 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
             .envs(envs.clone())
             .env(
                 "PASSWORD_STORE_DIR",
-                password_store_remote_temp_checkout.path().display().to_string(),
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
             )
             .stdout(Stdio::null())
             .status()
@@ -258,7 +272,10 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
             .envs(envs.clone())
             .env(
                 "PASSWORD_STORE_DIR",
-                password_store_remote_temp_checkout.path().display().to_string(),
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -269,8 +286,7 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
         let stdin = child.stdin.as_mut().unwrap();
         stdin.write_all(content.as_bytes()).unwrap();
         let output = child.wait_with_output().unwrap();
-        let stderr = String::from_utf8(output.stderr)
-            .expect("Could not read stderr as UTF-8");
+        let stderr = String::from_utf8(output.stderr).expect("Could not read stderr as UTF-8");
         assert_eq!(stderr, "");
         assert!(
             output.status.success(),
@@ -283,7 +299,10 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
             .envs(envs.clone())
             .env(
                 "PASSWORD_STORE_DIR",
-                password_store_remote_temp_checkout.path().display().to_string(),
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
             )
             .output()
             .expect("Failed to push changes to remote!");
@@ -295,7 +314,10 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
             .current_dir(&password_store_dir)
             .status()
             .expect("failed to git fetch from remote");
-        assert!(status.success(), "Failed to fetch from the repository's remote");
+        assert!(
+            status.success(),
+            "Failed to fetch from the repository's remote"
+        );
     } else {
         panic!("World state is not Prepared!");
     }

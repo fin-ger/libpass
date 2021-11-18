@@ -5,10 +5,10 @@ use directories::BaseDirs;
 use id_tree::{InsertBehavior, Node, NodeId, Tree};
 
 use crate::{
-    DecryptedPassword, Directory, DirectoryInserter, Entries, Entry, IntoStoreError, Location,
+    DecryptedPassword, Directory, DirectoryInserter, Entries, Entry, Git, IntoStoreError, Location,
     MatchedEntries, MatchedPasswords, MutDirectory, MutEntry, MutPassword, PassNode,
     PassphraseProvider, Password, PasswordInserter, SigningKey, Sorting, StoreError, StoreErrors,
-    TraversalOrder, Umask, Git,
+    TraversalOrder, Umask,
 };
 
 #[derive(Debug)]
@@ -253,13 +253,11 @@ impl Store {
                 if let Ok(path) = path.with_extension("gpg").canonicalize() {
                     path
                 } else {
-                    return Err(err)
-                        .with_store_error(path.display().to_string());
+                    return Err(err).with_store_error(path.display().to_string());
                 }
             }
             Err(err) => {
-                return Err(err)
-                    .with_store_error(path.display().to_string());
+                return Err(err).with_store_error(path.display().to_string());
             }
         };
 
@@ -310,17 +308,11 @@ impl Store {
     }
 
     pub fn mut_directory(&mut self, directory: Directory) -> MutDirectory {
-        MutDirectory::new(
-            directory.node_id().to_owned(),
-            self,
-        )
+        MutDirectory::new(directory.node_id().to_owned(), self)
     }
 
     pub fn mut_password(&mut self, password: Password) -> MutPassword {
-        MutPassword::new(
-            password.node_id().to_owned(),
-            self,
-        )
+        MutPassword::new(password.node_id().to_owned(), self)
     }
 
     pub fn mut_entry(&mut self, entry: Entry) -> MutEntry {
@@ -364,7 +356,12 @@ impl Store {
     }
 
     pub fn insert_password(&mut self, inserter: &PasswordInserter) -> Result<Password, StoreError> {
-        DecryptedPassword::create_and_write(inserter.lines.clone(), &self.path.join(&inserter.path), inserter.changes.clone(), self)?;
+        DecryptedPassword::create_and_write(
+            inserter.lines.clone(),
+            &self.path.join(&inserter.path),
+            inserter.changes.clone(),
+            self,
+        )?;
 
         Ok(self.insert_password_into_tree(
             inserter.name.clone(),
@@ -397,8 +394,7 @@ impl Store {
         &mut self,
         inserter: &DirectoryInserter,
     ) -> Result<Directory, StoreError> {
-        fs::create_dir(&inserter.path)
-            .with_store_error(inserter.path.display().to_string())?;
+        fs::create_dir(&inserter.path).with_store_error(inserter.path.display().to_string())?;
 
         Ok(self.insert_directory_into_tree(
             inserter.name.clone(),

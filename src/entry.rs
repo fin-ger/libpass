@@ -1,10 +1,12 @@
 use id_tree::NodeId;
 
-use std::{fs, io};
-use std::{fmt, path::PathBuf};
 use std::path::Path;
+use std::{fmt, path::PathBuf};
+use std::{fs, io};
 
-use crate::{Directory, IntoStoreError, MutDirectory, MutPassword, PassNode, Password, Store, StoreError};
+use crate::{
+    Directory, IntoStoreError, MutDirectory, MutPassword, PassNode, Password, Store, StoreError,
+};
 
 pub struct Entry {
     data: PassNode,
@@ -14,7 +16,11 @@ pub struct Entry {
 
 impl Entry {
     pub(crate) fn new(node_id: NodeId, data: PassNode, root: PathBuf) -> Self {
-        Self { data, node_id, root }
+        Self {
+            data,
+            node_id,
+            root,
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -85,10 +91,7 @@ pub struct MutEntry<'a> {
 
 impl<'a> MutEntry<'a> {
     pub(crate) fn new(node_id: NodeId, store: &'a mut Store) -> Self {
-        Self {
-            store,
-            node_id,
-        }
+        Self { store, node_id }
     }
 
     fn data_mut(&mut self) -> &mut PassNode {
@@ -126,15 +129,17 @@ impl<'a> MutEntry<'a> {
     pub fn rename<N: Into<String>>(&mut self, new_name: N) -> Result<(), StoreError> {
         let old_path = self.path().to_owned();
         if old_path == *self.store.location() {
-            return Err(io::Error::new(io::ErrorKind::Unsupported, "Cannot rename store's root directory"))
-                .with_store_error("Attempted to rename store's root directory")?;
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "Cannot rename store's root directory",
+            ))
+            .with_store_error("Attempted to rename store's root directory")?;
         }
         let mut new_path = old_path.with_file_name(new_name.into());
         if self.is_password() {
             new_path = new_path.with_extension("gpg");
         }
-        fs::rename(&old_path, &new_path)
-            .with_store_error("Failed to rename store entry")?;
+        fs::rename(&old_path, &new_path).with_store_error("Failed to rename store entry")?;
 
         let (name, path) = match self.data_mut() {
             PassNode::Password { name, path } => (name, path),
@@ -145,24 +150,30 @@ impl<'a> MutEntry<'a> {
 
         let root = self.store.location().to_owned();
         if let Some(git) = self.store.git() {
-            git.add(&[&old_path, &new_path]).with_store_error("failed to add rename to git")?;
+            git.add(&[&old_path, &new_path])
+                .with_store_error("failed to add rename to git")?;
             git.commit(&format!(
                 "Rename '{}' to '{}'.",
-                old_path.strip_prefix(&root).unwrap().with_extension("").display(),
-                new_path.strip_prefix(&root).unwrap().with_extension("").display(),
-            )).with_store_error("failed to commit rename to git")?;
+                old_path
+                    .strip_prefix(&root)
+                    .unwrap()
+                    .with_extension("")
+                    .display(),
+                new_path
+                    .strip_prefix(&root)
+                    .unwrap()
+                    .with_extension("")
+                    .display(),
+            ))
+            .with_store_error("failed to commit rename to git")?;
         }
 
         Ok(())
     }
 
-    pub fn move_to(&mut self, _directory: &Directory) {
+    pub fn move_to(&mut self, _directory: &Directory) {}
 
-    }
-
-    pub fn copy_to(&mut self, _directory: &Directory) {
-        
-    }
+    pub fn copy_to(&mut self, _directory: &Directory) {}
 
     pub fn mut_password(self) -> Option<MutPassword<'a>> {
         if self.is_password() {

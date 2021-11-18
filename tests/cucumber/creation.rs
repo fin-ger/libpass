@@ -345,7 +345,10 @@ fn a_new_password_store_is_initialized(world: &mut IncrementalWorld, location: S
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Prepared { home, key_id, envs, .. } = prev {
+    if let IncrementalWorld::Prepared {
+        home, key_id, envs, ..
+    } = prev
+    {
         let location = match location.as_str() {
             "" => Location::Automatic,
             " at a manually provided location" => {

@@ -15,11 +15,7 @@ pub struct PasswordInserter {
 }
 
 impl PasswordInserter {
-    pub(crate) fn new(
-        parent: NodeId,
-        path: PathBuf,
-        name: String,
-    ) -> Self {
+    pub(crate) fn new(parent: NodeId, path: PathBuf, name: String) -> Self {
         Self {
             parent,
             path,
@@ -58,7 +54,8 @@ impl PasswordInserter {
             } else {
                 self.lines.push(passphrase.into());
             }
-            self.changes.push("Add generated passphrase to password".into());
+            self.changes
+                .push("Add generated passphrase to password".into());
 
             Ok(self)
         })

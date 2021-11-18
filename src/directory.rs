@@ -1,9 +1,51 @@
 use gpgme::{Context, Protocol};
 use id_tree::{NodeId, RemoveBehavior};
 
-use std::{fs::{self, OpenOptions}, io::Read, path::{Path, PathBuf}};
+use std::{
+    fs::{self, OpenOptions},
+    io::Read,
+    path::{Path, PathBuf},
+};
 
-use crate::{DirectoryInserter, IntoStoreError, MutEntry, Traversal, PassNode, PasswordInserter, Store, StoreError};
+use crate::{
+    DirectoryInserter, IntoStoreError, MutEntry, PassNode, PasswordInserter, Store, StoreError,
+    Traversal,
+};
+
+#[derive(Debug)]
+pub struct GpgKeyId {
+    id: String,
+    key: gpgme::Key,
+}
+
+impl PartialEq for GpgKeyId {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+impl Eq for GpgKeyId {}
+
+impl std::hash::Hash for GpgKeyId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl GpgKeyId {
+    pub(crate) fn new(key_id: impl AsRef<str>) -> gpgme::Result<Self> {
+        let mut ctx = gpgme::Context::from_protocol(gpgme::Protocol::OpenPgp)?;
+        let key = ctx.get_key(key_id.as_ref())?;
+
+        Ok(Self {
+            id: key_id.as_ref().to_owned(),
+            key,
+        })
+    }
+
+    pub fn get_key(&self) -> &gpgme::Key {
+        &self.key
+    }
+}
 
 #[derive(Debug)]
 pub struct Directory {
@@ -88,7 +130,7 @@ impl Directory {
                     return Err(StoreError::NoGpgId(self.path.display().to_string()));
                 }
             } else {
-                return Err(StoreError::NoGpgId(self.path.display().to_string()))
+                return Err(StoreError::NoGpgId(self.path.display().to_string()));
             }
         }
     }
@@ -122,14 +164,8 @@ pub struct MutDirectory<'a> {
 }
 
 impl<'a> MutDirectory<'a> {
-    pub(crate) fn new(
-        node_id: NodeId,
-        store: &'a mut Store,
-    ) -> Self {
-        Self {
-            node_id,
-            store,
-        }
+    pub(crate) fn new(node_id: NodeId, store: &'a mut Store) -> Self {
+        Self { node_id, store }
     }
 
     fn to_entry(&'_ mut self) -> MutEntry<'_> {
@@ -195,16 +231,23 @@ impl<'a> MutDirectory<'a> {
                     .with_store_error("Could not remove directory recursively")?;
             }
         }
-        self.store.tree.remove_node(self.node_id, RemoveBehavior::DropChildren)
+        self.store
+            .tree
+            .remove_node(self.node_id, RemoveBehavior::DropChildren)
             .expect("Could not remove password from internal tree structure");
 
         let root = self.store.location().to_owned();
         if let Some(git) = self.store.git() {
-            git.add(&[&path]).with_store_error("failed to add removal to git")?;
+            git.add(&[&path])
+                .with_store_error("failed to add removal to git")?;
             git.commit(&format!(
                 "Remove '{}' from store.",
-                path.strip_prefix(root).unwrap().with_extension("").display(),
-            )).with_store_error("failed to commit removal to git")?;
+                path.strip_prefix(root)
+                    .unwrap()
+                    .with_extension("")
+                    .display(),
+            ))
+            .with_store_error("failed to commit removal to git")?;
         }
 
         Ok(())
@@ -223,6 +266,11 @@ impl<'a> MutDirectory<'a> {
     }
 
     pub fn make_immut(self) -> Directory {
-        Directory::new(self.name().into(), self.path().into(), self.store.location().into(), self.node_id)
+        Directory::new(
+            self.name().into(),
+            self.path().into(),
+            self.store.location().into(),
+            self.node_id,
+        )
     }
 }

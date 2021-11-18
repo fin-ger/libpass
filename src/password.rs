@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use id_tree::RemoveBehavior;
 use id_tree::NodeId;
+use id_tree::RemoveBehavior;
 
 use crate::IntoStoreError;
 use crate::{DecryptedPassword, Directory, MutEntry, PassNode, Store, StoreError};
@@ -13,7 +13,7 @@ pub struct Password {
     name: String,
     path: PathBuf,
     node_id: NodeId,
-    root: PathBuf
+    root: PathBuf,
 }
 
 impl Password {
@@ -73,14 +73,8 @@ pub struct MutPassword<'a> {
 }
 
 impl<'a> MutPassword<'a> {
-    pub(crate) fn new(
-        node_id: NodeId,
-        store: &'a mut Store,
-    ) -> Self {
-        Self {
-            node_id,
-            store,
-        }
+    pub(crate) fn new(node_id: NodeId, store: &'a mut Store) -> Self {
+        Self { node_id, store }
     }
 
     fn to_entry(&'_ mut self) -> MutEntry<'_> {
@@ -124,18 +118,24 @@ impl<'a> MutPassword<'a> {
     pub fn remove(self) -> Result<(), StoreError> {
         let path = self.path().to_owned();
 
-        fs::remove_file(&path)
-            .with_store_error("Could not remove password")?;
-        self.store.tree.remove_node(self.node_id, RemoveBehavior::DropChildren)
+        fs::remove_file(&path).with_store_error("Could not remove password")?;
+        self.store
+            .tree
+            .remove_node(self.node_id, RemoveBehavior::DropChildren)
             .expect("Could not remove password from internal tree structure");
 
         let root = self.store.location().to_owned();
         if let Some(git) = self.store.git() {
-            git.add(&[&path]).with_store_error("failed to add removal to git")?;
+            git.add(&[&path])
+                .with_store_error("failed to add removal to git")?;
             git.commit(&format!(
                 "Remove '{}' from store.",
-                path.strip_prefix(root).unwrap().with_extension("").display(),
-            )).with_store_error("failed to commit removal to git")?;
+                path.strip_prefix(root)
+                    .unwrap()
+                    .with_extension("")
+                    .display(),
+            ))
+            .with_store_error("failed to commit removal to git")?;
         }
 
         Ok(())

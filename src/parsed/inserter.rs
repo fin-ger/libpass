@@ -14,7 +14,7 @@ pub struct PasswordInserter {
     pub(crate) name: String,
     pub(crate) passphrase: Option<String>,
     pub(crate) lines: Vec<PasswordLine>,
-    pub(crate) changes: Vec<String>
+    pub(crate) changes: Vec<String>,
 }
 
 impl PasswordInserter {
@@ -49,8 +49,7 @@ impl PasswordInserter {
     pub fn entry<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &mut Self {
         let key = key.into();
         self.changes.push(format!("Add {} entry to password", key));
-        self.lines
-            .push(PasswordLine::Entry(key, value.into()));
+        self.lines.push(PasswordLine::Entry(key, value.into()));
         self
     }
 
@@ -58,7 +57,8 @@ impl PasswordInserter {
     pub fn generator(&mut self) -> PassphraseGenerator<&mut Self> {
         PassphraseGenerator::new(move |passphrase| {
             self.passphrase = Some(passphrase.into());
-            self.changes.push("Add generated passphrase to password".into());
+            self.changes
+                .push("Add generated passphrase to password".into());
             Ok(self)
         })
     }

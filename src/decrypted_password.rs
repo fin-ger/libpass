@@ -1,6 +1,5 @@
 use crate::{IntoStoreError, Store, StoreError};
 use gpgme::{Context, Key, Protocol};
-use tempfile::NamedTempFile;
 use std::{
     fmt,
     fs::{File, OpenOptions},
@@ -8,6 +7,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use tempfile::NamedTempFile;
 
 #[cfg(feature = "passphrase-utils")]
 use crate::passphrase_utils::{AnalyzedPassphrase, PassphraseGenerator};
@@ -45,22 +45,35 @@ pub(crate) fn search_gpg_ids(mut path: &Path, ctx: &mut Context) -> Result<Vec<K
     }
 }
 
-pub(crate) fn save_password_to_file(store: &mut Store, path: &Path, password: impl fmt::Display, summary: Option<String>, changes: Vec<String>) -> Result<(), StoreError> {
+pub(crate) fn save_password_to_file(
+    store: &mut Store,
+    path: &Path,
+    password: impl fmt::Display,
+    summary: Option<String>,
+    changes: Vec<String>,
+) -> Result<(), StoreError> {
     let mut f = NamedTempFile::new_in(path.parent().unwrap())
         .with_store_error(path.display().to_string())?;
 
-    let mut ctx = Context::from_protocol(Protocol::OpenPgp)
-        .with_store_error(path.display().to_string())?;
+    let mut ctx =
+        Context::from_protocol(Protocol::OpenPgp).with_store_error(path.display().to_string())?;
     let content = format!("{}", password);
     let mut encrypted = Vec::new();
     let gpg_ids = search_gpg_ids(path, &mut ctx)?;
-    let result = ctx.encrypt(gpg_ids.iter(), content, &mut encrypted)
+    let result = ctx
+        .encrypt(gpg_ids.iter(), content, &mut encrypted)
         .with_store_error(path.display().to_string())?;
     if result.invalid_recipients().count() > 0 {
-        return Err(StoreError::Gpg("Could not encrypt for all gpg-id's".to_owned(), gpgme::Error::BAD_PUBKEY));
+        return Err(StoreError::Gpg(
+            "Could not encrypt for all gpg-id's".to_owned(),
+            gpgme::Error::BAD_PUBKEY,
+        ));
     }
     if encrypted.len() <= 0 {
-        return Err(StoreError::Gpg(format!("Could not encrypt {}", path.display().to_string()), gpgme::Error::NOT_ENCRYPTED));
+        return Err(StoreError::Gpg(
+            format!("Could not encrypt {}", path.display().to_string()),
+            gpgme::Error::NOT_ENCRYPTED,
+        ));
     }
 
     f.write_all(&encrypted)
@@ -71,16 +84,14 @@ pub(crate) fn save_password_to_file(store: &mut Store, path: &Path, password: im
         .with_store_error(path.display().to_string())?;
 
     let pw_name = pw_name(path, store);
-    if let Some(git) = store.git() { // this store uses git
+    if let Some(git) = store.git() {
+        // this store uses git
         git.add(&[path]).with_store_error("add")?;
 
         let mut message = if let Some(message) = summary {
             message
         } else {
-            format!(
-                "Edit password for '{}' using libpass.",
-                pw_name,
-            )
+            format!("Edit password for '{}' using libpass.", pw_name,)
         };
 
         if !changes.is_empty() {
@@ -135,16 +146,24 @@ impl DecryptedPassword {
         })
     }
 
-    pub(crate) fn create_and_write(lines: Vec<String>, path: &Path, changes: Vec<String>, store: &mut Store) -> Result<Self, StoreError> {
+    pub(crate) fn create_and_write(
+        lines: Vec<String>,
+        path: &Path,
+        changes: Vec<String>,
+        store: &mut Store,
+    ) -> Result<Self, StoreError> {
         let mut me = Self {
             lines,
             path: path.to_owned(),
             changes,
         };
-        me.save(Some(format!(
-            "Add password for '{}' using libpass.",
-            pw_name(path, store),
-        )), store)?;
+        me.save(
+            Some(format!(
+                "Add password for '{}' using libpass.",
+                pw_name(path, store),
+            )),
+            store,
+        )?;
         Ok(me)
     }
 
@@ -162,7 +181,8 @@ impl DecryptedPassword {
     #[cfg(feature = "passphrase-utils")]
     pub fn generator<'a>(&'a mut self, store: &'a mut Store) -> PassphraseGenerator<'a, ()> {
         PassphraseGenerator::new(move |passphrase| {
-            self.changes.push("Set generated passphrase for password".into());
+            self.changes
+                .push("Set generated passphrase for password".into());
             self.replace_line(store, 0, passphrase).map(|_| ())
         })
     }
@@ -175,18 +195,27 @@ impl DecryptedPassword {
     }
 
     pub fn batch_edit<'a>(&'a mut self, store: &'a mut Store) -> DecryptedPasswordBatchEdit<'a> {
-        DecryptedPasswordBatchEdit::new(self.lines.clone(), self.changes.clone(), move |lines, changes| {
-            self.changes = changes;
-            self.set_lines(store, lines)
-        })
+        DecryptedPasswordBatchEdit::new(
+            self.lines.clone(),
+            self.changes.clone(),
+            move |lines, changes| {
+                self.changes = changes;
+                self.set_lines(store, lines)
+            },
+        )
     }
 
     pub fn passphrase(&self) -> Option<&str> {
         self.lines.first().map(|p| p.as_str())
     }
 
-    pub fn set_passphrase<P: Into<String>>(&mut self, store: &mut Store, passphrase: P) -> Result<(), StoreError> {
-        self.changes.push("Set given passphrase for password".into());
+    pub fn set_passphrase<P: Into<String>>(
+        &mut self,
+        store: &mut Store,
+        passphrase: P,
+    ) -> Result<(), StoreError> {
+        self.changes
+            .push("Set given passphrase for password".into());
         self.replace_line(store, 0, passphrase).map(|_| ())
     }
 
@@ -194,7 +223,11 @@ impl DecryptedPassword {
         self.lines.iter().map(|line| line.as_str())
     }
 
-    pub fn set_lines<L: Into<Vec<String>>>(&mut self, store: &mut Store, lines: L) -> Result<(), StoreError> {
+    pub fn set_lines<L: Into<Vec<String>>>(
+        &mut self,
+        store: &mut Store,
+        lines: L,
+    ) -> Result<(), StoreError> {
         let old_lines = std::mem::replace(&mut self.lines, lines.into());
         match self.save(None, store) {
             Ok(()) => Ok(()),
@@ -246,11 +279,11 @@ impl DecryptedPassword {
         }
     }
 
-    pub fn remove_line(&mut self, store: &mut Store, position: Position) -> Result<(), StoreError> {
+    pub fn remove_line(&mut self, store: &mut Store, position: Position) -> Result<String, StoreError> {
         let old_lines = self.lines.clone();
-        self.lines.remove(position);
+        let removed_line = self.lines.remove(position);
         match self.save(None, store) {
-            Ok(()) => Ok(()),
+            Ok(()) => Ok(removed_line),
             Err(err) => {
                 self.lines = old_lines;
                 Err(err)
@@ -258,11 +291,19 @@ impl DecryptedPassword {
         }
     }
 
-    pub fn prepend_line<L: Into<String>>(&mut self, store: &mut Store, line: L) -> Result<(), StoreError> {
+    pub fn prepend_line<L: Into<String>>(
+        &mut self,
+        store: &mut Store,
+        line: L,
+    ) -> Result<(), StoreError> {
         self.insert_line(store, 1, line)
     }
 
-    pub fn append_line<L: Into<String>>(&mut self, store: &mut Store, line: L) -> Result<(), StoreError> {
+    pub fn append_line<L: Into<String>>(
+        &mut self,
+        store: &mut Store,
+        line: L,
+    ) -> Result<(), StoreError> {
         self.insert_line(store, self.lines.len(), line)
     }
 }
@@ -274,7 +315,11 @@ pub struct DecryptedPasswordBatchEdit<'a> {
 }
 
 impl<'a> DecryptedPasswordBatchEdit<'a> {
-    fn new<F: 'a + FnOnce(Vec<String>, Vec<String>) -> Result<(), StoreError>>(lines: Vec<String>, changes: Vec<String>, batch_handler: F) -> Self {
+    fn new<F: 'a + FnOnce(Vec<String>, Vec<String>) -> Result<(), StoreError>>(
+        lines: Vec<String>,
+        changes: Vec<String>,
+        batch_handler: F,
+    ) -> Self {
         Self {
             lines,
             changes,
@@ -283,7 +328,8 @@ impl<'a> DecryptedPasswordBatchEdit<'a> {
     }
 
     pub fn passphrase<P: Into<String>>(mut self, passphrase: P) -> Self {
-        self.changes.push("Set given passphrase for password".into());
+        self.changes
+            .push("Set given passphrase for password".into());
         if let Some(old_passphrase) = self.lines.get_mut(0) {
             *old_passphrase = passphrase.into();
         } else {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use pass::{Location, StoreBuilder, TraversalOrder};
 use anyhow::{Context, Result};
+use pass::{Location, StoreBuilder, TraversalOrder};
 
 fn main() -> Result<()> {
     let repo_path = PathBuf::from("/home/fin/Development/playground/git/sample");
@@ -12,7 +12,8 @@ fn main() -> Result<()> {
     assert!(!store.has_errors());
     assert!(store.git().context("no git repo")?.config_valid());
 
-    let root = store.show("./", TraversalOrder::LevelOrder)?
+    let root = store
+        .show("./", TraversalOrder::LevelOrder)?
         .next()
         .context("Could not retrieve root directory")?
         .directory()
@@ -22,10 +23,12 @@ fn main() -> Result<()> {
         .passphrase("0p3n-5354m3")
         .insert(&mut store)?;
 
-    let manufacturers = root.directory_insertion("Manufacturers")
+    let manufacturers = root
+        .directory_insertion("Manufacturers")
         .insert(&mut store)?;
 
-    manufacturers.password_insertion("Yoyodyne")
+    manufacturers
+        .password_insertion("Yoyodyne")
         .generator()
         .exclude_similar_characters(false)
         .length(20)
