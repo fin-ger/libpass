@@ -162,7 +162,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
 
     match world {
         IncrementalWorld::NewPassword { envs, .. } => {
-            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().count(), 8, "Not enough commits");
             assert_eq!(
                 stdout.lines().next().unwrap(),
                 "Add password for 'Ready Room' using libpass."
@@ -180,7 +180,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
             assert_eq!(pw_content, "what-are-our-options\n");
         }
         IncrementalWorld::EditedPassword { envs, .. } => {
-            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().count(), 8, "Not enough commits");
             assert_eq!(
                 stdout.lines().next().unwrap(),
                 "Edit password for 'Manufacturers/Sokor' using libpass."
@@ -198,7 +198,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
             assert_eq!(pw_content, "pum-yIghoSQo'\nBetter not tell Picard about this.\nNote: Picard already knows...\n");
         }
         IncrementalWorld::RemovedPassword { envs, .. } => {
-            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().count(), 8, "Not enough commits");
             assert_eq!(
                 stdout.lines().next().unwrap(),
                 "Remove 'Manufacturers/Sokor' from store."
@@ -214,7 +214,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
             assert!(!status.success(), "Password Sokor has not been removed!");
         }
         IncrementalWorld::RenamedPassword { envs, .. } => {
-            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().count(), 8, "Not enough commits");
             assert_eq!(
                 stdout.lines().next().unwrap(),
                 "Rename 'Manufacturers/Sokor' to 'Manufacturers/None of your concern'."
@@ -230,7 +230,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
             assert!(status.success(), "Sokor password has not been renamed!");
         }
         IncrementalWorld::NewPasswordAndDirectory { envs, .. } => {
-            assert_eq!(stdout.lines().count(), 1, "Not enough commits");
+            assert_eq!(stdout.lines().count(), 3, "Not enough commits");
             assert_eq!(
                 stdout.lines().next().unwrap(),
                 "Add password for 'Warp Nacelles/Starfleet' using libpass."
@@ -248,7 +248,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
             assert_eq!(pw_content, "two-nacelles-ftw\n");
         }
         IncrementalWorld::RenamedDirectory { envs, .. } => {
-            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().count(), 8, "Not enough commits");
             assert_eq!(
                 stdout.lines().next().unwrap(),
                 "Rename 'Entertainment/Holo Deck' to 'Entertainment/Novels'."
@@ -264,7 +264,7 @@ fn the_repository_is_clean_and_contains_a_new_commit(world: &mut IncrementalWorl
             assert!(status.success(), "Novels directory has not been renamed!");
         }
         IncrementalWorld::RemovedDirectory { envs, .. } => {
-            assert_eq!(stdout.lines().count(), 6, "Not enough commits");
+            assert_eq!(stdout.lines().count(), 8, "Not enough commits");
             assert_eq!(
                 stdout.lines().next().unwrap(),
                 "Remove 'Entertainment' from store."
@@ -482,6 +482,9 @@ fn a_password_is_edited(world: &mut IncrementalWorld) {
         envs,
     } = prev
     {
+        println!("Super dupi un so xdg: {:?}", git2::Config::find_xdg());
+        println!("Super dupi un so global: {:?}", git2::Config::find_global());
+        println!("Super dupi un so system: {:?}", git2::Config::find_system());
         let password = store
             .show("Manufacturers/Sokor", TraversalOrder::LevelOrder)
             .expect("could not find Sokor password")

@@ -139,6 +139,12 @@ impl IncrementalWorld {
                 .to_string(),
         );
 
+        unsafe {
+            // update cached environment variables in libgit2
+            libgit2_sys::git_libgit2_shutdown();
+            libgit2_sys::git_libgit2_init();
+        }
+
         let key_id = String::from("test@key.email");
         let builder = AssertUnwindSafe(StoreBuilder::default());
 
