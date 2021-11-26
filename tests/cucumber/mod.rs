@@ -6,7 +6,7 @@ mod world;
 use anyhow::Context as AnyhowContext;
 use cucumber::{FailureWriter, WorldInit};
 use gpgme::{Context, CreateKeyFlags, PassphraseRequest, PinentryMode, Protocol};
-use std::{env, fs, io::Write, path::Path, process::Command};
+use std::{env, fs, io::Write, path::Path, process::Command, time::Duration};
 use world::IncrementalWorld;
 
 const DIR: bool = true;
@@ -89,15 +89,15 @@ fn initialize_pgp_home(home: &Path) -> anyhow::Result<()> {
     ctx.create_key_with_flags(
         "Test Key <test@key.email>",
         "default",
-        None,
-        CreateKeyFlags::SIGN | CreateKeyFlags::ENCR,
+        Duration::from_secs(0),
+        CreateKeyFlags::SIGN | CreateKeyFlags::ENCR | CreateKeyFlags::NOEXPIRE,
     )
     .context("Failed to create GPG key")?;
     ctx.create_key_with_flags(
         "Test Key 2 <test2@key.email>",
         "default",
-        None,
-        CreateKeyFlags::SIGN | CreateKeyFlags::ENCR,
+        Duration::from_secs(0),
+        CreateKeyFlags::SIGN | CreateKeyFlags::ENCR | CreateKeyFlags::NOEXPIRE,
     )
     .context("Failed to create GPG key")?;
     let key = ctx.get_secret_key("test@key.email")?;

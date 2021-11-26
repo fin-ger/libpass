@@ -102,7 +102,9 @@ Feature: Git operations in the password store
     And a password store is opened
     When the password store is successfully opened
     And changes are pulled from the remote
-    Then the repository is clean
+    Then no conflicts need to be resolved
+    And the remote's commits are fast-forwarded
+    And the repository is clean
 
   Scenario: Pull non-fast-forward changes from the git remote with automatic merging
     Given a password store exists
@@ -114,7 +116,9 @@ Feature: Git operations in the password store
     When the password store is successfully opened
     And a new password is created
     And changes are pulled from the remote
-    Then the repository is clean
+    Then no conflicts need to be resolved
+    And the remote's commits are merged
+    And the repository is clean
 
   Scenario: Pull non-fast-forward changes from the git remote with manual merging and resolve merge conflict by letting the user resolve it using decrypted passwords
     Given a password store exists
@@ -126,5 +130,6 @@ Feature: Git operations in the password store
     When the password store is successfully opened
     And a password is edited
     And changes are pulled from the remote
-    Then the merge conflict can be manually resolved
+    Then merge conflicts are manually resolved
+    And the remote's commits are merged
     And the repository is clean

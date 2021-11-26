@@ -169,9 +169,8 @@ impl Git {
         remote_commit: AnnotatedCommit<'a>,
     ) -> Result<ConflictResolver<'a>, git2::Error> {
         Ok(ConflictResolver::new_without_conflicts(&self.repo, move |repo, _idx| {
-            let refname = format!("refs/heads/{}", local_branch_name);
             repo.reference(
-                &refname,
+                &local_branch_name,
                 remote_commit.id(),
                 true,
                 &format!(
@@ -180,7 +179,7 @@ impl Git {
                     remote_commit.id()
                 ),
             )?;
-            repo.set_head(&refname)?;
+            repo.set_head(&local_branch_name)?;
             repo.checkout_head(Some(
                 CheckoutBuilder::default()
                     .allow_conflicts(true)
@@ -194,7 +193,9 @@ impl Git {
 
     fn normal_merge<'a>(
         &'a self,
+        local_commit_name: String,
         local_commit: AnnotatedCommit<'a>,
+        remote_commit_name: String,
         remote_commit: AnnotatedCommit<'a>,
     ) -> GitResult<ConflictResolver<'a>> {
         let local_tree = self.repo.find_commit(local_commit.id())?.tree()?;
@@ -206,9 +207,12 @@ impl Git {
 
         ConflictResolver::from_index(idx, &self.repo, move |repo, idx| {
             let mut idx = idx.unwrap();
+            if idx.has_conflicts() {
+                return Err(git2::Error::new(git2::ErrorCode::Conflict, git2::ErrorClass::Merge, "Not all conflicts resolved"));
+            }
             let result_tree = repo.find_tree(idx.write_tree_to(repo)?)?;
             // now create the merge commit
-            let msg = format!("Merge: {} into {}", remote_commit.id(), local_commit.id());
+            let msg = format!("Merge {} into {}", remote_commit_name.trim_start_matches("refs/remotes/"), local_commit_name.trim_start_matches("refs/heads/"));
             let sig = repo.signature()?;
             let local_commit = repo.find_commit(local_commit.id())?;
             let remote_commit = repo.find_commit(remote_commit.id())?;
@@ -221,8 +225,9 @@ impl Git {
                 &result_tree,
                 &[&local_commit, &remote_commit],
             )?;
+
             // Set working tree to match head.
-            repo.checkout_head(None)?;
+            repo.checkout_head(Some(CheckoutBuilder::default().force()))?;
 
             Ok(())
         })
@@ -237,7 +242,7 @@ impl Git {
         let current_branch_name = head.name().expect("Branch name not valid utf-8 🤷");
         let current_branch_ref = self
             .repo
-            .find_reference(&format!("refs/heads/{}", current_branch_name))?;
+            .find_reference(current_branch_name)?;
         let current_branch = self
             .repo
             .reference_to_annotated_commit(&current_branch_ref)?;
@@ -252,7 +257,7 @@ impl Git {
             .repo
             .reference_to_annotated_commit(&upstream_branch_ref)?;
 
-        let analysis = self.repo.merge_analysis(&[&upstream_branch])?;
+        let analysis = self.repo.merge_analysis_for_ref(&current_branch_ref, &[&upstream_branch])?;
         if analysis.0.is_none() {
             return Err(git2::Error::new(
                 ErrorCode::Unmerged,
@@ -263,14 +268,14 @@ impl Git {
             Ok(ConflictResolver::new_without_conflicts(&self.repo, |_repo, _idx| {
                 Ok(()) // do nothing
             }))
-        } else if analysis.0.is_normal() {
-            self.normal_merge(current_branch, upstream_branch)
         } else if analysis.0.is_fast_forward() {
             self.fast_forward(
                 current_branch_name.to_owned(),
                 current_branch_ref,
                 upstream_branch,
             )
+        } else if analysis.0.is_normal() {
+            self.normal_merge(current_branch_name.to_owned(), current_branch, upstream_branch_name.to_owned(), upstream_branch)
         } else if analysis.0.is_unborn() {
             self.set_head(current_branch_name.to_owned(), upstream_branch)
         } else {

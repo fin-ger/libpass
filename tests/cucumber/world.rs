@@ -6,8 +6,19 @@ use std::{convert::Infallible, path::PathBuf};
 use anyhow::Context as AnyhowContext;
 use async_trait::async_trait;
 use cucumber::{World, WorldInit};
-use pass::{DecryptedPassword, Directory, Password, Store, StoreBuilder, StoreError};
+use pass::{ConflictResolver, DecryptedPassword, Directory, Password, Store, StoreBuilder, StoreError};
 use tempfile::TempDir;
+
+use ouroboros::self_referencing;
+
+#[self_referencing(pub_extras)]
+#[derive(Debug)]
+pub struct ResolvingStore {
+    pub store: Store,
+    #[borrows(mut store)]
+    #[not_covariant]
+    pub resolver: Option<ConflictResolver<'this>>,
+}
 
 #[derive(Debug, WorldInit)]
 pub enum IncrementalWorld {
@@ -89,6 +100,11 @@ pub enum IncrementalWorld {
         store: AssertUnwindSafe<Store>,
         envs: HashMap<String, String>,
         result: Result<(), git2::Error>,
+    },
+    Pulled {
+        home: TempDir,
+        resolving_store: AssertUnwindSafe<ResolvingStore>,
+        envs: HashMap<String, String>,
     },
 }
 

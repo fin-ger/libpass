@@ -6,6 +6,7 @@ use std::os::unix::ffi::OsStrExt;
 
 use super::{GitResult, conflicted_binary::ConflictedBinary, conflicted_gpg_id::ConflictedGpgId, conflicted_password::ConflictedPassword, conflicted_plain_text::ConflictedPlainText};
 
+#[derive(Debug)]
 pub(super) struct ConflictEntry {
     pub(super) index_entry: git2::IndexEntry,
     pub(super) content: Vec<u8>,
@@ -40,6 +41,20 @@ pub struct ConflictResolver<'a> {
     finish_cb: Box<dyn FnOnce(&'a git2::Repository, Option<git2::Index>) -> GitResult<()> + 'a>,
     pub(super) maybe_index: Option<git2::Index>,
     pub(super) repository: &'a git2::Repository,
+}
+
+impl<'a> std::fmt::Debug for ConflictResolver<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConflictResolver")
+            .field("conflicted_passwords", &self.conflicted_passwords)
+            .field("conflicted_gpg_ids", &self.conflicted_gpg_ids)
+            .field("conflicted_plain_texts", &self.conflicted_plain_texts)
+            .field("conflicted_binaries", &self.conflicted_binaries)
+            .field("finish_cb", &String::from("Box<dyn FnOnce(&'a git2::Repository, Option<git2::Index>) -> GitResult<()> + 'a>"))
+            .field("maybe_index", &self.maybe_index.as_ref().map(|_| "Index"))
+            .field("repository", &String::from("GitRepository"))
+            .finish()
+    }
 }
 
 impl<'a> ConflictResolver<'a> {

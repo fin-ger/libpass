@@ -4,6 +4,7 @@ use std::os::unix::ffi::OsStrExt;
 use crate::ConflictResolver;
 use super::{GitResult, conflict_resolver::ConflictEntry};
 
+#[derive(Debug)]
 pub struct ConflictedBinary {
     ancestor: ConflictEntry,
     our: ConflictEntry,

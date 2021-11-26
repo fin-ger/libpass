@@ -2,10 +2,10 @@ use std::panic::AssertUnwindSafe;
 use std::process::{Command, Stdio};
 
 use cucumber::{then, when};
-use pass::GitRemote;
+use pass::{GitRemote, Store};
 use pass::{Traversal, TraversalOrder};
 
-use crate::world::IncrementalWorld;
+use crate::world::{IncrementalWorld, ResolvingStoreBuilder};
 use crate::{DIR, PW};
 
 #[then("the password store is empty")]
@@ -360,6 +360,115 @@ fn pushing_the_commit_fails(world: &mut IncrementalWorld) {
     }
 }
 
+#[then("no conflicts need to be resolved")]
+fn no_conflicts_need_to_be_resolved(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Pulled { mut resolving_store, envs, home, .. } = prev {
+        resolving_store.with_resolver_mut(|wrapped_resolver| {
+            let resolver = wrapped_resolver.take().unwrap();
+            assert!(resolver.conflicted_passwords().is_empty(), "conflicted_passwords is not empty!");
+            assert!(resolver.conflicted_gpg_ids().is_empty(), "conflicted_gpg_ids is not empty!");
+            assert!(resolver.conflicted_plain_texts().is_empty(), "conflicted_plain_texts is not empty!");
+            assert!(resolver.conflicted_binaries().is_empty(), "conflicted_binaries is not empty!");
+            resolver.finish().expect("Failed to finish resolving merge conflicts");
+        });
+        let store = AssertUnwindSafe(resolving_store.0.into_heads().store);
+
+        *world = IncrementalWorld::Successful {
+            home,
+            store,
+            envs,
+        };
+    } else {
+        panic!("World state is not Pulled!");
+    }
+}
+
+#[then("merge conflicts are manually resolved")]
+fn merge_conflicts_are_manually_resolved(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Pulled { mut resolving_store, envs, home, .. } = prev {
+        resolving_store.with_resolver_mut(|wrapped_resolver| {
+            let resolver = wrapped_resolver.take().unwrap();
+            let conflicted_passwords = resolver.conflicted_passwords();
+            assert_eq!(conflicted_passwords.len(), 1);
+            for conflicted_password in conflicted_passwords {
+                
+            }
+
+            assert!(resolver.conflicted_gpg_ids().is_empty(), "conflicted_gpg_ids is not empty!");
+            assert!(resolver.conflicted_plain_texts().is_empty(), "conflicted_plain_texts is not empty!");
+            assert!(resolver.conflicted_binaries().is_empty(), "conflicted_binaries is not empty!");
+            resolver.finish().expect("Failed to finish resolving merge conflicts");
+        });
+        let store = AssertUnwindSafe(resolving_store.0.into_heads().store);
+
+        *world = IncrementalWorld::Successful {
+            home,
+            store,
+            envs,
+        };
+    } else {
+        panic!("World state is not Pulled!");
+    }
+}
+
+#[then("the remote's commits are fast-forwarded")]
+fn the_remotes_commits_are_fast_forwarded(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { envs, .. } = world {
+        let output = Command::new("pass")
+            .args(&["git", "log", "--pretty=format:[%an] %s", "--graph"])
+            .envs(envs.clone())
+            .stdout(Stdio::piped())
+            .output()
+            .expect("Could not check git commit");
+        let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
+
+        assert_eq!(stdout, "* [Remote User] Add given password for Entertainment/Music Library to store.\n\
+                            * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
+                            * [Test User] Add given password for Manufacturers/Sokor to store.\n\
+                            * [Test User] Add given password for Manufacturers/StrutCo to store.\n\
+                            * [Test User] Add given password for Phone to store.\n\
+                            * [Test User] Add given password for Manufacturers/Yoyodyne to store.\n\
+                            * [Test User] Configure git repository for gpg file diff.\n\
+                            * [Test User] Add current contents of password store.");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[then("the remote's commits are merged")]
+fn the_remotes_commits_are_merged(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { envs, .. } = world {
+        let output = Command::new("pass")
+            .args(&["git", "log", "--pretty=format:[%an] %s", "--graph"])
+            .envs(envs.clone())
+            .stdout(Stdio::piped())
+            .output()
+            .expect("Could not check git commit");
+        let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
+
+        assert_eq!(stdout, "*   [Test User] Merge origin/master into master\n\
+                            |\\  \n\
+                            | * [Remote User] Add given password for Entertainment/Music Library to store.\n\
+                            * | [Test User] Add password for 'Ready Room' using libpass.\n\
+                            |/  \n\
+                            * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
+                            * [Test User] Add given password for Manufacturers/Sokor to store.\n\
+                            * [Test User] Add given password for Manufacturers/StrutCo to store.\n\
+                            * [Test User] Add given password for Phone to store.\n\
+                            * [Test User] Add given password for Manufacturers/Yoyodyne to store.\n\
+                            * [Test User] Configure git repository for gpg file diff.\n\
+                            * [Test User] Add current contents of password store.");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
 #[when("a password is opened")]
 fn a_password_is_opened(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
@@ -482,9 +591,6 @@ fn a_password_is_edited(world: &mut IncrementalWorld) {
         envs,
     } = prev
     {
-        println!("Super dupi un so xdg: {:?}", git2::Config::find_xdg());
-        println!("Super dupi un so global: {:?}", git2::Config::find_global());
-        println!("Super dupi un so system: {:?}", git2::Config::find_system());
         let password = store
             .show("Manufacturers/Sokor", TraversalOrder::LevelOrder)
             .expect("could not find Sokor password")
@@ -730,4 +836,30 @@ fn the_commit_is_pushed_to_the_remote(world: &mut IncrementalWorld) {
     } else {
         panic!("World state is not Successful!");
     }
+}
+
+#[when("changes are pulled from the remote")]
+fn changes_are_pulled_from_the_remote(world: &mut IncrementalWorld) {
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    let (store, home, envs) = match prev {
+        IncrementalWorld::Successful { store, home, envs, .. } => (store, home, envs),
+        IncrementalWorld::NewPassword { store, home, envs, .. } => (store, home, envs),
+        IncrementalWorld::EditedPassword { store, home, envs, .. } => (store, home, envs),
+        _ => panic!("World state not valid: {:?}", prev),
+    };
+
+    let resolving_store = AssertUnwindSafe(ResolvingStoreBuilder {
+        store: store.0,
+        resolver_builder: |store: &mut Store| {
+            Some(store
+                .git().expect("Store not using git")
+                .pull().expect("Could not pull changes from remote"))
+        },
+    }.build());
+    *world = IncrementalWorld::Pulled {
+        resolving_store,
+        home,
+        envs,
+    };
 }

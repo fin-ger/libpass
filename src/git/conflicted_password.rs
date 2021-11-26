@@ -36,6 +36,7 @@ pub(crate) fn search_gpg_ids_in_index(mut path: &Path, repo: &git2::Repository, 
     }
 }
 
+#[derive(Debug)]
 pub struct ConflictedPassword {
     ancestor: ConflictEntry,
     our: ConflictEntry,
@@ -252,6 +253,17 @@ impl ConflictedDecryptedPassword {
     ) {
         self.insert_line(self.lines.len(), line)
     }
+}
+
+pub struct PasswordLine<'a> {
+    content: &'a str,
+    linum: u64,
+}
+
+pub enum PasswordChange<'a> {
+    Equal(&'a [PasswordLine<'a>]),
+    Delete(&'a [PasswordLine<'a>]),
+    Insert(&'a [PasswordLine<'a>]),
 }
 
 pub struct PasswordChanges;

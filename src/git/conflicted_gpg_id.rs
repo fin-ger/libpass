@@ -5,6 +5,7 @@ use crate::{ConflictResolver, GpgKeyId};
 
 use super::{GitResult, conflict_resolver::ConflictEntry};
 
+#[derive(Debug)]
 pub struct ConflictedGpgId {
     ancestor: ConflictEntry,
     our: ConflictEntry,
