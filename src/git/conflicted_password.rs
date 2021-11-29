@@ -1,7 +1,10 @@
-use std::{ffi::OsStr, fmt, path::{Path, PathBuf}};
+use std::{ffi::OsStr, fmt, fs::OpenOptions, io::Read, path::{Path, PathBuf}};
 use std::os::unix::ffi::OsStrExt;
 
-use crate::{ConflictResolver, IntoStoreError, Position, StoreError};
+use git2::{IndexEntry, IndexTime};
+use libgit2_sys::git_index;
+
+use crate::{ConflictResolver, IntoStoreError, Position, StoreError, clone_index_entry};
 
 use super::conflict_resolver::ConflictEntry;
 
@@ -17,15 +20,31 @@ pub(crate) fn search_gpg_ids_in_index(mut path: &Path, repo: &git2::Repository, 
     };
 
     let original_path = path.to_owned();
+    let root = repo.path().parent().unwrap();
     loop {
         if let Some(gpg_id_index_entry) = idx.get_path(&path.join(".gpg-id"), -1) {
             let blob = repo.find_blob(gpg_id_index_entry.id).expect("gpg-id blob not in repository");
             let content = String::from_utf8(blob.content().to_vec()).expect("gpg-id not valid utf-8");
 
-            return Ok(content
-                      .lines()
-                      .map(|line| ctx.get_key(line).expect("Key not found"))
-                      .collect());
+            return content
+                .lines()
+                .map(|line| {
+                    ctx.get_key(line).map_err(|err| StoreError::Gpg("GPG-ID of .gpg-id file not found".to_owned(), err))
+                }).collect();
+        } else if root.join(path).is_dir() && root.join(path).join(".gpg-id").is_file() {
+            let mut file = OpenOptions::new()
+                .read(true)
+                .open(root.join(path).join(".gpg-id"))
+                .expect("Failed to read .gpg-id");
+            let mut content = String::new();
+            file.read_to_string(&mut content).expect("not valid utf-8");
+
+            return content
+                .lines()
+                .map(|line| {
+                    ctx.get_key(line).map_err(|err| StoreError::Gpg("GPG-ID of .gpg-id file not found".to_owned(), err))
+                })
+                .collect();
         }
 
         if let Some(parent) = path.parent() {
@@ -36,7 +55,7 @@ pub(crate) fn search_gpg_ids_in_index(mut path: &Path, repo: &git2::Repository, 
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConflictedPassword {
     ancestor: ConflictEntry,
     our: ConflictEntry,
@@ -87,14 +106,6 @@ impl ConflictedPassword {
         self.their_password.clone()
     }
 
-    pub fn our_changes(&self) -> PasswordChanges {
-        todo!();
-    }
-
-    pub fn their_changes(&self) -> PasswordChanges {
-        todo!();
-    }
-
     pub fn resolve(&mut self, conflict_resolver: &mut ConflictResolver, resolved_password: ConflictedDecryptedPassword) -> Result<(), StoreError> {
         if self.is_resolved {
             return Err(git2::Error::new(git2::ErrorCode::Invalid, git2::ErrorClass::Merge, "Merge conflict already resolved"))
@@ -130,6 +141,7 @@ impl ConflictedPassword {
             .expect("No index entry matches path of resolved password");
         index.add_frombuffer(index_entry, &encrypted)
             .with_store_error("add resolved merge conflict to index")?;
+
         self.is_resolved = true;
 
         Ok(())
@@ -166,7 +178,7 @@ impl ConflictedDecryptedPassword {
             .map(|recp| recp.key_id().expect("Key id not valid utf-8").to_owned())
             .collect();
 
-        let lines = String::from_utf8_lossy(&content)
+        let lines = String::from_utf8_lossy(&decrypted)
             .lines()
             .map(|line| line.to_owned())
             .collect::<Vec<String>>();
@@ -188,6 +200,65 @@ impl ConflictedDecryptedPassword {
         let passphrase = self.passphrase()?;
 
         Some(AnalyzedPassphrase::new(passphrase))
+    }
+
+    pub fn diff<'a>(&'a self, other: &'a ConflictedDecryptedPassword) -> Vec<PasswordChange<'a>> {
+        let my_lines = self.lines().collect::<Vec<&str>>();
+        let other_lines = other.lines().collect::<Vec<&str>>();
+
+        similar::capture_diff_slices(similar::Algorithm::Myers, &my_lines, &other_lines)
+            .drain(..).map(|diff_op| {
+                match diff_op {
+                    similar::DiffOp::Equal { old_index, new_index, len } => {
+                        let lines = my_lines[old_index..old_index+len].into_iter()
+                            .enumerate().map(|(idx, line)| PasswordLine {
+                                content: line,
+                                my_linum: old_index + idx,
+                                other_linum: new_index + idx,
+                            })
+                            .collect::<Vec<PasswordLine>>();
+                        PasswordChange::Equal(lines)
+                    },
+                    similar::DiffOp::Delete { old_index, old_len, new_index } => {
+                        let lines = my_lines[old_index..old_index+old_len].into_iter()
+                            .enumerate().map(|(idx, line)| PasswordLine {
+                                content: line,
+                                my_linum: old_index + idx,
+                                other_linum: new_index,
+                            })
+                            .collect::<Vec<PasswordLine>>();
+                        PasswordChange::Delete(lines)
+                    },
+                    similar::DiffOp::Insert { old_index, new_index, new_len } => {
+                        let lines: Vec<PasswordLine> = other_lines[new_index..new_index+new_len].into_iter()
+                            .enumerate().map(|(idx, line)| PasswordLine {
+                                content: line,
+                                my_linum: old_index,
+                                other_linum: new_index + idx,
+                            })
+                            .collect();
+                        PasswordChange::Insert(lines)
+                    },
+                    similar::DiffOp::Replace { old_index, old_len, new_index, new_len } => {
+                        let my_lines = my_lines[old_index..old_index+old_len].into_iter()
+                            .enumerate().map(|(idx, line)| PasswordLine {
+                                content: line,
+                                my_linum: old_index + idx,
+                                other_linum: new_index,
+                            })
+                            .collect::<Vec<PasswordLine>>();
+                        let other_lines = other_lines[new_index..new_index+new_len].into_iter()
+                            .enumerate().map(|(idx, line)| PasswordLine {
+                                content: line,
+                                my_linum: old_index,
+                                other_linum: new_index + idx,
+                            })
+                            .collect::<Vec<PasswordLine>>();
+                        PasswordChange::Replace { my_lines, other_lines }
+                    },
+                }
+            })
+            .collect::<Vec<PasswordChange>>()
     }
 
     pub fn passphrase(&self) -> Option<&str> {
@@ -255,15 +326,20 @@ impl ConflictedDecryptedPassword {
     }
 }
 
+#[derive(Debug)]
 pub struct PasswordLine<'a> {
-    content: &'a str,
-    linum: u64,
+    pub content: &'a str,
+    pub my_linum: usize,
+    pub other_linum: usize,
 }
 
+#[derive(Debug)]
 pub enum PasswordChange<'a> {
-    Equal(&'a [PasswordLine<'a>]),
-    Delete(&'a [PasswordLine<'a>]),
-    Insert(&'a [PasswordLine<'a>]),
+    Equal(Vec<PasswordLine<'a>>),
+    Delete(Vec<PasswordLine<'a>>),
+    Insert(Vec<PasswordLine<'a>>),
+    Replace {
+        my_lines: Vec<PasswordLine<'a>>,
+        other_lines: Vec<PasswordLine<'a>>,
+    },
 }
-
-pub struct PasswordChanges;

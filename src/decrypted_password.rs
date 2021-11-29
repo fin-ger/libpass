@@ -31,10 +31,12 @@ pub(crate) fn search_gpg_ids(mut path: &Path, ctx: &mut Context) -> Result<Vec<K
             let mut content = String::new();
             file.read_to_string(&mut content).expect("not valid utf-8");
 
-            return Ok(content
+            return content
                 .lines()
-                .map(|line| ctx.get_key(line).expect("Key not found"))
-                .collect());
+                .map(|line| {
+                    ctx.get_key(line).map_err(|err| StoreError::Gpg("GPG-ID of .gpg-id file not found".to_owned(), err))
+                })
+                .collect();
         }
 
         if let Some(parent) = path.parent() {

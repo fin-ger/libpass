@@ -3,6 +3,7 @@ name = "pass"
 version = "0.1.0"
 authors = ["Fin Christensen <christensen.fin@gmail.com>"]
 edition = "2018"
+include = ["src/**/*", "LICENSE", "README.md"]
 
 [features]
 default = ["passphrase-utils"]
@@ -26,6 +27,7 @@ custom_debug = "0.5.0"
 tempfile = "3.2.0"
 walkdir = "2.3.2"
 dissimilar = "1.0.2"
+similar = "2.1.0"
 
 [dev-dependencies]
 anyhow = "1.0.44"
@@ -38,7 +40,6 @@ rand = "0.8.4"
 tokio = { version = "1.12.0", features = ["full"] }
 num_cpus = "1.13.0"
 libgit2-sys = "0.12.23"
-owning_ref = "0.4.1"
 ouroboros = "0.10.1"
 
 [dev-dependencies.cucumber]

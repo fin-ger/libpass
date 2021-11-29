@@ -4,6 +4,12 @@ mod conflicted_gpg_id;
 mod conflicted_plain_text;
 mod conflicted_binary;
 
+pub use conflict_resolver::*;
+pub use conflicted_password::*;
+pub use conflicted_gpg_id::*;
+pub use conflicted_plain_text::*;
+pub use conflicted_binary::*;
+
 use std::{fmt, path::PathBuf};
 use std::path::Path;
 

@@ -3,7 +3,7 @@ use std::os::unix::ffi::OsStrExt;
 
 use super::{GitResult, conflict_resolver::{ConflictEntry, ConflictResolver}};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConflictedPlainText {
     ancestor: ConflictEntry,
     our: ConflictEntry,

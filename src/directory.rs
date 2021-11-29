@@ -12,7 +12,7 @@ use crate::{
     Traversal,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GpgKeyId {
     id: String,
     key: gpgme::Key,

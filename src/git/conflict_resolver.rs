@@ -4,6 +4,8 @@ use std::{ffi::OsStr, path::Path};
 // this is a unix password store, so it is reasonable to assume unix here
 use std::os::unix::ffi::OsStrExt;
 
+use git2::IndexEntry;
+
 use super::{GitResult, conflicted_binary::ConflictedBinary, conflicted_gpg_id::ConflictedGpgId, conflicted_password::ConflictedPassword, conflicted_plain_text::ConflictedPlainText};
 
 #[derive(Debug)]
@@ -13,23 +15,26 @@ pub(super) struct ConflictEntry {
     pub(super) path: PathBuf,
 }
 
+pub(crate) fn clone_index_entry(index_entry: &IndexEntry) -> IndexEntry {
+    IndexEntry {
+        ctime: index_entry.ctime.clone(),
+        mtime: index_entry.mtime.clone(),
+        dev: index_entry.dev,
+        ino: index_entry.ino,
+        mode: index_entry.mode,
+        uid: index_entry.uid,
+        gid: index_entry.gid,
+        file_size: index_entry.file_size,
+        id: index_entry.id.clone(),
+        flags: index_entry.flags,
+        flags_extended: index_entry.flags_extended,
+        path: index_entry.path.clone(),
+    }
+}
+
 impl Clone for ConflictEntry {
     fn clone(&self) -> Self {
-        let index_entry = git2::IndexEntry {
-            ctime: self.index_entry.ctime.clone(),
-            mtime: self.index_entry.mtime.clone(),
-            dev: self.index_entry.dev,
-            ino: self.index_entry.ino,
-            mode: self.index_entry.mode,
-            uid: self.index_entry.uid,
-            gid: self.index_entry.gid,
-            file_size: self.index_entry.file_size,
-            id: self.index_entry.id.clone(),
-            flags: self.index_entry.flags,
-            flags_extended: self.index_entry.flags_extended,
-            path: self.index_entry.path.clone(),
-        };
-        Self { index_entry, content: self.content.clone(), path: self.path.clone() }
+        Self { index_entry: clone_index_entry(&self.index_entry), content: self.content.clone(), path: self.path.clone() }
     }
 }
 
@@ -54,6 +59,14 @@ impl<'a> std::fmt::Debug for ConflictResolver<'a> {
             .field("maybe_index", &self.maybe_index.as_ref().map(|_| "Index"))
             .field("repository", &String::from("GitRepository"))
             .finish()
+    }
+}
+
+fn path_has_extension(path: &Path, ext: &str) -> bool {
+    if let Some(path_ext) = path.extension().and_then(OsStr::to_str) {
+        path_ext == ext
+    } else {
+        false
     }
 }
 
@@ -92,7 +105,7 @@ impl<'a> ConflictResolver<'a> {
             let ancestor_entry = ConflictEntry {
                 index_entry: ancestor,
                 content: ancestor_content,
-                path: ancestor_path,
+                path: ancestor_path.clone(),
             };
             let our_entry = ConflictEntry {
                 index_entry: our,
@@ -105,7 +118,10 @@ impl<'a> ConflictResolver<'a> {
                 path: their_path.clone(),
             };
 
-            if our_path.ends_with(".gpg") || their_path.ends_with(".gpg") {
+            if path_has_extension(&ancestor_path, "gpg") ||
+                path_has_extension(&our_path, "gpg") ||
+                path_has_extension(&their_path, "gpg")
+            {
                 let conflicted_password_res = ConflictedPassword::new(ancestor_entry.clone(), our_entry.clone(), their_entry.clone());
                 if conflicted_password_res.is_some() {
                     conflicted_passwords.push(conflicted_password_res.unwrap());
@@ -113,7 +129,10 @@ impl<'a> ConflictResolver<'a> {
                 }
             }
 
-            if our_path.ends_with(".gpg-id") || their_path.ends_with(".gpg-id") {
+            if path_has_extension(&ancestor_path, "gpg-id") ||
+                path_has_extension(&our_path, "gpg-id") ||
+                path_has_extension(&their_path, "gpg-id")
+            {
                 let conflicted_gpg_id = ConflictedGpgId::new(ancestor_entry.clone(), our_entry.clone(), their_entry.clone());
                 if conflicted_gpg_id.is_some() {
                     conflicted_gpg_ids.push(conflicted_gpg_id.unwrap());
@@ -141,20 +160,20 @@ impl<'a> ConflictResolver<'a> {
         })
     }
 
-    pub fn conflicted_passwords(&self) -> &Vec<ConflictedPassword> {
-        &self.conflicted_passwords
+    pub fn conflicted_passwords(&self) -> Vec<ConflictedPassword> {
+        self.conflicted_passwords.clone()
     }
 
-    pub fn conflicted_gpg_ids(&self) -> &Vec<ConflictedGpgId> {
-        &self.conflicted_gpg_ids
+    pub fn conflicted_gpg_ids(&self) -> Vec<ConflictedGpgId> {
+        self.conflicted_gpg_ids.clone()
     }
 
-    pub fn conflicted_plain_texts(&self) -> &Vec<ConflictedPlainText> {
-        &self.conflicted_plain_texts
+    pub fn conflicted_plain_texts(&self) -> Vec<ConflictedPlainText> {
+        self.conflicted_plain_texts.clone()
     }
 
-    pub fn conflicted_binaries(&self) -> &Vec<ConflictedBinary> {
-        &self.conflicted_binaries
+    pub fn conflicted_binaries(&self) -> Vec<ConflictedBinary> {
+        self.conflicted_binaries.clone()
     }
 
     pub fn finish(self) -> GitResult<()> {

@@ -76,6 +76,14 @@ fn the_password_store_uses_git(world: &mut IncrementalWorld) {
             .unwrap();
         assert!(status.success(), "Failed to set email in git config");
 
+        let status = Command::new("git")
+            .args(&["config", "--global", "init.defaultBranch", "main"])
+            .envs(envs.clone())
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set default branch name in git config");
+
         let status = Command::new("pass")
             .args(&["git", "init"])
             .envs(envs.clone())
@@ -194,7 +202,7 @@ fn the_repository_has_a_remote(world: &mut IncrementalWorld) {
 
         let status = Command::new("git")
             .arg("branch")
-            .arg("--set-upstream-to=origin/master")
+            .arg("--set-upstream-to=origin/main")
             .envs(envs.clone())
             .current_dir(&password_store_dir)
             .status()
@@ -266,9 +274,9 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
             .unwrap();
         assert!(status.success(), "Failed to set email in git config");
 
-        let content = "jean#luc\nusername: captain\n";
+        let content = "pum-yIghoSQo'\nBetter not tell Picard about this.\nPicard here: Let's talk about this later...\n";
         let mut child = Command::new("pass")
-            .args(&["insert", "--multiline", "Entertainment/Music Library"])
+            .args(&["insert", "--force", "--multiline", "Manufacturers/Sokor"])
             .envs(envs.clone())
             .env(
                 "PASSWORD_STORE_DIR",

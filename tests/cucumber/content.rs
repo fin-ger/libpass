@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 
 use cucumber::{then, when};
 use pass::{GitRemote, Store};
-use pass::{Traversal, TraversalOrder};
+use pass::{Traversal, TraversalOrder, PasswordChange};
 
 use crate::world::{IncrementalWorld, ResolvingStoreBuilder};
 use crate::{DIR, PW};
@@ -312,7 +312,7 @@ fn pushing_the_commit_succeeds(world: &mut IncrementalWorld) {
         result.expect("Failed to push to remote");
 
         let output = Command::new("pass")
-            .args(&["git", "log", "origin/master..master"])
+            .args(&["git", "log", "origin/main..main"])
             .envs(envs.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -342,7 +342,7 @@ fn pushing_the_commit_fails(world: &mut IncrementalWorld) {
         );
 
         let output = Command::new("pass")
-            .args(&["git", "log", "origin/master..master"])
+            .args(&["git", "log", "origin/main..main"])
             .envs(envs.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -393,16 +393,55 @@ fn merge_conflicts_are_manually_resolved(world: &mut IncrementalWorld) {
 
     if let IncrementalWorld::Pulled { mut resolving_store, envs, home, .. } = prev {
         resolving_store.with_resolver_mut(|wrapped_resolver| {
-            let resolver = wrapped_resolver.take().unwrap();
-            let conflicted_passwords = resolver.conflicted_passwords();
-            assert_eq!(conflicted_passwords.len(), 1);
-            for conflicted_password in conflicted_passwords {
-                
-            }
-
+            let mut resolver = wrapped_resolver.take().unwrap();
             assert!(resolver.conflicted_gpg_ids().is_empty(), "conflicted_gpg_ids is not empty!");
             assert!(resolver.conflicted_plain_texts().is_empty(), "conflicted_plain_texts is not empty!");
             assert!(resolver.conflicted_binaries().is_empty(), "conflicted_binaries is not empty!");
+            let mut conflicted_passwords = resolver.conflicted_passwords();
+            assert_eq!(conflicted_passwords.len(), 1);
+            for conflicted_password in conflicted_passwords.iter_mut() {
+                let ancestor = conflicted_password.ancestor_password();
+                let our = conflicted_password.our_password();
+                let their = conflicted_password.their_password();
+
+                let mut resolved = ancestor.clone();
+                for change in ancestor.diff(&our) {
+                    match change {
+                        PasswordChange::Equal(_) => continue,
+                        PasswordChange::Delete(_) => continue,
+                        PasswordChange::Insert(lines) => {
+                            for line in lines.iter() {
+                                resolved.insert_line(line.my_linum, line.content);
+                            }
+                        },
+                        PasswordChange::Replace { other_lines, .. } => {
+                            for line in other_lines.iter() {
+                                resolved.insert_line(line.my_linum, line.content);
+                            }
+                        },
+                    }
+                }
+
+                for change in ancestor.diff(&their) {
+                    match change {
+                        PasswordChange::Equal(_) => continue,
+                        PasswordChange::Delete(_) => continue,
+                        PasswordChange::Insert(lines) => {
+                            for line in lines.iter() {
+                                resolved.insert_line(line.my_linum, line.content);
+                            }
+                        },
+                        PasswordChange::Replace { other_lines, .. } => {
+                            for line in other_lines.iter() {
+                                resolved.insert_line(line.my_linum, line.content);
+                            }
+                        },
+                    }
+                }
+
+                conflicted_password.resolve(&mut resolver, resolved).expect("Could not resolve conflict");
+            }
+
             resolver.finish().expect("Failed to finish resolving merge conflicts");
         });
         let store = AssertUnwindSafe(resolving_store.0.into_heads().store);
@@ -428,7 +467,7 @@ fn the_remotes_commits_are_fast_forwarded(world: &mut IncrementalWorld) {
             .expect("Could not check git commit");
         let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
 
-        assert_eq!(stdout, "* [Remote User] Add given password for Entertainment/Music Library to store.\n\
+        assert_eq!(stdout, "* [Remote User] Add given password for Manufacturers/Sokor to store.\n\
                             * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
                             * [Test User] Add given password for Manufacturers/Sokor to store.\n\
                             * [Test User] Add given password for Manufacturers/StrutCo to store.\n\
@@ -452,9 +491,9 @@ fn the_remotes_commits_are_merged(world: &mut IncrementalWorld) {
             .expect("Could not check git commit");
         let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
 
-        assert_eq!(stdout, "*   [Test User] Merge origin/master into master\n\
+        assert_eq!(stdout, "*   [Test User] Merge origin/main into main\n\
                             |\\  \n\
-                            | * [Remote User] Add given password for Entertainment/Music Library to store.\n\
+                            | * [Remote User] Add given password for Manufacturers/Sokor to store.\n\
                             * | [Test User] Add password for 'Ready Room' using libpass.\n\
                             |/  \n\
                             * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
