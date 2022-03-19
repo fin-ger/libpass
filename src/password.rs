@@ -1,12 +1,9 @@
-use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
 use id_tree::NodeId;
-use id_tree::RemoveBehavior;
 
-use crate::IntoStoreError;
-use crate::{DecryptedPassword, Directory, MutEntry, PassNode, Store, StoreError};
+use crate::{DecryptedPassword, Directory, MutEntry, PassNode, Store, StoreError, Traversal};
 
 #[derive(Debug)]
 pub struct Password {
@@ -115,30 +112,8 @@ impl<'a> MutPassword<'a> {
         )
     }
 
-    pub fn remove(self) -> Result<(), StoreError> {
-        let path = self.path().to_owned();
-
-        fs::remove_file(&path).with_store_error("Could not remove password")?;
-        self.store
-            .tree
-            .remove_node(self.node_id, RemoveBehavior::DropChildren)
-            .expect("Could not remove password from internal tree structure");
-
-        let root = self.store.location().to_owned();
-        if let Some(git) = self.store.git() {
-            git.add(&[&path])
-                .with_store_error("failed to add removal to git")?;
-            git.commit(&format!(
-                "Remove '{}' from store.",
-                path.strip_prefix(root)
-                    .unwrap()
-                    .with_extension("")
-                    .display(),
-            ))
-            .with_store_error("failed to commit removal to git")?;
-        }
-
-        Ok(())
+    pub fn remove(mut self) -> Result<(), StoreError> {
+        self.to_entry().remove(Traversal::None)
     }
 
     pub fn rename<N: Into<String>>(&mut self, name: N) -> Result<(), StoreError> {

@@ -1,10 +1,6 @@
-use std::{ffi::OsStr, fmt, fs::OpenOptions, io::Read, path::{Path, PathBuf}};
-use std::os::unix::ffi::OsStrExt;
+use std::{fmt, fs::OpenOptions, io::Read, path::{Path, PathBuf}};
 
-use git2::{IndexEntry, IndexTime};
-use libgit2_sys::git_index;
-
-use crate::{ConflictResolver, IntoStoreError, Position, StoreError, clone_index_entry};
+use crate::{ConflictResolver, IntoStoreError, Position, StoreError};
 
 use super::conflict_resolver::ConflictEntry;
 
@@ -57,21 +53,37 @@ pub(crate) fn search_gpg_ids_in_index(mut path: &Path, repo: &git2::Repository, 
 
 #[derive(Debug, Clone)]
 pub struct ConflictedPassword {
-    ancestor: ConflictEntry,
-    our: ConflictEntry,
-    their: ConflictEntry,
-    ancestor_password: ConflictedDecryptedPassword,
-    our_password: ConflictedDecryptedPassword,
-    their_password: ConflictedDecryptedPassword,
+    ancestor: Option<ConflictEntry>,
+    our: Option<ConflictEntry>,
+    their: Option<ConflictEntry>,
+    ancestor_password: Option<ConflictedDecryptedPassword>,
+    our_password: Option<ConflictedDecryptedPassword>,
+    their_password: Option<ConflictedDecryptedPassword>,
     is_resolved: bool,
 }
 
 impl ConflictedPassword {
-    pub(super) fn new(ancestor: ConflictEntry, our: ConflictEntry, their: ConflictEntry) -> Option<Self> {
+    pub(super) fn new(ancestor: Option<ConflictEntry>, our: Option<ConflictEntry>, their: Option<ConflictEntry>) -> Option<Self> {
+        let ancestor_password = if let Some(ancestor) = &ancestor {
+            Some(ConflictedDecryptedPassword::from_buffer(&ancestor.content, &ancestor.path).ok()?)
+        } else {
+            None
+        };
+        let our_password = if let Some(our) = &our {
+            Some(ConflictedDecryptedPassword::from_buffer(&our.content, &our.path).ok()?)
+        } else {
+            None
+        };
+        let their_password = if let Some(their) = &their {
+            Some(ConflictedDecryptedPassword::from_buffer(&their.content, &their.path).ok()?)
+        } else {
+            None
+        };
+
         Some(Self {
-            ancestor_password: ConflictedDecryptedPassword::from_buffer(&ancestor.content, &ancestor.path).ok()?,
-            our_password: ConflictedDecryptedPassword::from_buffer(&our.content, &our.path).ok()?,
-            their_password: ConflictedDecryptedPassword::from_buffer(&their.content, &their.path).ok()?,
+            ancestor_password,
+            our_password,
+            their_password,
             ancestor,
             our,
             their,
@@ -79,68 +91,101 @@ impl ConflictedPassword {
         })
     }
 
-    pub fn ancestor_path(&self) -> &Path {
-        &self.ancestor.path
+    pub fn ancestor_path(&self) -> Option<&Path> {
+        if let Some(ancestor) = &self.ancestor {
+            Some(&ancestor.path)
+        } else {
+            None
+        }
     }
 
-    pub fn our_path(&self) -> &Path {
-        &self.our.path
+    pub fn our_path(&self) -> Option<&Path> {
+        if let Some(our) = &self.our {
+            Some(&our.path)
+        } else {
+            None
+        }
     }
 
-    pub fn their_path(&self) -> &Path {
-        &self.their.path
+    pub fn their_path(&self) -> Option<&Path> {
+        if let Some(their) = &self.their {
+            Some(&their.path)
+        } else {
+            None
+        }
     }
 
-    pub fn ancestor_password(&self) -> ConflictedDecryptedPassword {
+    pub fn ancestor_password(&self) -> Option<ConflictedDecryptedPassword> {
         // clone password, so it can be parsed
         self.ancestor_password.clone()
     }
 
-    pub fn our_password(&self) -> ConflictedDecryptedPassword {
+    pub fn our_password(&self) -> Option<ConflictedDecryptedPassword> {
         // clone password, so it can be parsed
         self.our_password.clone()
     }
 
-    pub fn their_password(&self) -> ConflictedDecryptedPassword {
+    pub fn their_password(&self) -> Option<ConflictedDecryptedPassword> {
         // clone password, so it can be parsed
         self.their_password.clone()
     }
 
-    pub fn resolve(&mut self, conflict_resolver: &mut ConflictResolver, resolved_password: ConflictedDecryptedPassword) -> Result<(), StoreError> {
+    pub fn resolve(&mut self, conflict_resolver: &mut ConflictResolver, resolved_password: Option<ConflictedDecryptedPassword>) -> Result<(), StoreError> {
         if self.is_resolved {
             return Err(git2::Error::new(git2::ErrorCode::Invalid, git2::ErrorClass::Merge, "Merge conflict already resolved"))
                 .with_store_error("Resolve merge conflict");
         }
 
-        let mut ctx = gpgme::Context::from_protocol(gpgme::Protocol::OpenPgp)
-            .with_store_error(resolved_password.path.display().to_string())?;
-        let content = format!("{}", resolved_password);
-        let mut encrypted = Vec::new();
-        let gpg_ids = search_gpg_ids_in_index(&resolved_password.path, &conflict_resolver.repository, &conflict_resolver.maybe_index, &mut ctx)?;
-        let result = ctx
-            .encrypt(gpg_ids.iter(), content, &mut encrypted)
-            .with_store_error(resolved_password.path.display().to_string())?;
-        if result.invalid_recipients().count() > 0 {
-            return Err(StoreError::Gpg(
-                "Could not encrypt for all gpg-id's".to_owned(),
-                gpgme::Error::BAD_PUBKEY,
-            ));
-        }
-        if encrypted.len() <= 0 {
-            return Err(StoreError::Gpg(
-                format!("Could not encrypt {}", resolved_password.path.display().to_string()),
-                gpgme::Error::NOT_ENCRYPTED,
-            ));
+        let mut entries = self.our.iter()
+            .chain(self.ancestor.iter())
+            .chain(self.their.iter());
+        let mut conflict_entry = entries
+            .next()
+            .expect("No index entry available for conflict resolution. So it finally happened... Couldn't produce a test case triggering this behavior and libgit2 docs say nothing about it. Please report it in libpass's issue tracker!")
+            .clone();
+
+        if let Some(resolved_password) = resolved_password {
+            let mut ctx = gpgme::Context::from_protocol(gpgme::Protocol::OpenPgp)
+                .with_store_error(resolved_password.path.display().to_string())?;
+            let content = format!("{}", resolved_password);
+            let mut encrypted = Vec::new();
+            let gpg_ids = search_gpg_ids_in_index(&resolved_password.path, &conflict_resolver.repository, &conflict_resolver.maybe_index, &mut ctx)?;
+            let result = ctx
+                .encrypt(gpg_ids.iter(), content, &mut encrypted)
+                .with_store_error(resolved_password.path.display().to_string())?;
+            if result.invalid_recipients().count() > 0 {
+                return Err(StoreError::Gpg(
+                    "Could not encrypt for all gpg-id's".to_owned(),
+                    gpgme::Error::BAD_PUBKEY,
+                ));
+            }
+            if encrypted.len() <= 0 {
+                return Err(StoreError::Gpg(
+                    format!("Could not encrypt {}", resolved_password.path.display().to_string()),
+                    gpgme::Error::NOT_ENCRYPTED,
+                ));
+            }
+            let oid = conflict_resolver.repository.blob(&encrypted)
+                .with_store_error("add resolved password blob to repository")?;
+            conflict_entry.index_entry.file_size = encrypted.len() as u32;
+            conflict_entry.index_entry.id = oid;
+
+            let index = conflict_resolver.maybe_index.as_mut()
+                .expect("Conflict resolver has no index set when trying to resolve conflict");
+            index.add(&conflict_entry.index_entry)
+                .with_store_error("add resolved merge conflict to index")?;
+        } else {
+            let index = conflict_resolver.maybe_index.as_mut()
+                .expect("Conflict resolver has no index set when trying to resolve conflict");
+            // stage is ANY (-1) to remove it from ancestor, ours, and theirs
+            index.remove(&conflict_entry.path, -1)
+                .with_store_error("remove resolved merge conflict from index")?;
         }
 
         let index = conflict_resolver.maybe_index.as_mut()
             .expect("Conflict resolver has no index set when trying to resolve conflict");
-        let entries = [&self.ancestor.index_entry, &self.our.index_entry, &self.their.index_entry];
-        let index_entry = entries.iter()
-            .find(|ie| Path::new(OsStr::from_bytes(&ie.path)) == &resolved_password.path)
-            .expect("No index entry matches path of resolved password");
-        index.add_frombuffer(index_entry, &encrypted)
-            .with_store_error("add resolved merge conflict to index")?;
+        index.conflict_remove(&conflict_entry.path)
+            .with_store_error("remove conflict from repository")?;
 
         self.is_resolved = true;
 

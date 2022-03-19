@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
+use std::fs::File;
 
 use cucumber::given;
 
@@ -299,6 +300,128 @@ fn the_repositorys_remote_contains_new_commits(world: &mut IncrementalWorld) {
         assert!(
             output.status.success(),
             "Failed to insert password into pass repository!"
+        );
+
+        let output = Command::new("pass")
+            .arg("git")
+            .arg("push")
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .output()
+            .expect("Failed to push changes to remote!");
+        assert!(output.status.success(), "Failed to push changes to remote!");
+
+        let status = Command::new("git")
+            .arg("fetch")
+            .envs(envs.clone())
+            .current_dir(&password_store_dir)
+            .status()
+            .expect("failed to git fetch from remote");
+        assert!(
+            status.success(),
+            "Failed to fetch from the repository's remote"
+        );
+    } else {
+        panic!("World state is not Prepared!");
+    }
+}
+
+#[given("the repository's remote contains new commits of a binary file")]
+fn the_repositorys_remote_contains_new_commits_of_a_binary_file(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, home, .. } = world {
+        let password_store_dir = if let Ok(path) = std::env::var("PASSWORD_STORE_DIR") {
+            path.into()
+        } else if let Some(path) = envs.get("PASSWORD_STORE_DIR") {
+            path.into()
+        } else {
+            home.path().join(".password-store")
+        };
+        let password_store_remote = home.path().join("password-store-remote");
+
+        let password_store_remote_temp_checkout = tempfile::Builder::new()
+            .prefix("libpass-remote-temp-checkout_")
+            .tempdir()
+            .expect("Failed to create temporary checkout directory");
+
+        let status = Command::new("git")
+            .arg("clone")
+            .arg(&password_store_remote)
+            .arg(
+                &password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .envs(envs.clone())
+            .status()
+            .expect("Failed to prepare temporary checkout");
+        assert!(status.success(), "Failed to prepare temporary checkout");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.name", "Remote User"])
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set username in git config");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.email", "remote@key.email"])
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set email in git config");
+
+        let content = &[0xDE, 0xAD, 0xBE, 0xEF];
+        let binary_file_path = password_store_remote_temp_checkout.path()
+            .join("Manufacturers/Sokor-Starmap");
+        let mut binary_file = File::create(&binary_file_path).expect("Failed to create binary file");
+        binary_file.write_all(content).expect("Failed to write to binary file");
+
+        let status = Command::new("git")
+            .arg("add")
+            .arg(binary_file_path)
+            .envs(envs.clone())
+            .current_dir(&password_store_remote_temp_checkout)
+            .status()
+            .expect("Failed to add binary file to git");
+        assert!(
+            status.success(),
+            "Failed to add binary file to git"
+        );
+
+        let status = Command::new("git")
+            .arg("commit")
+            .arg("-m")
+            .arg("Add 'Manufacturers/Sokor-Starmap' binary file to store")
+            .envs(envs.clone())
+            .current_dir(&password_store_remote_temp_checkout)
+            .status()
+            .expect("Failed to commit binary file to git");
+        assert!(
+            status.success(),
+            "Failed to commit binary file to git"
         );
 
         let output = Command::new("pass")

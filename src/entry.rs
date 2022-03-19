@@ -1,11 +1,12 @@
 use id_tree::NodeId;
+use id_tree::RemoveBehavior;
 
 use std::path::Path;
 use std::{fmt, path::PathBuf};
 use std::{fs, io};
 
 use crate::{
-    Directory, IntoStoreError, MutDirectory, MutPassword, PassNode, Password, Store, StoreError,
+    Directory, EntryKind, IntoStoreError, MutDirectory, MutPassword, PassNode, Password, Store, StoreError,
 };
 
 pub struct Entry {
@@ -31,16 +32,12 @@ impl Entry {
         self.data.path()
     }
 
+    pub fn kind(&self) -> EntryKind {
+        self.data.kind()
+    }
+
     pub(crate) fn node_id(&self) -> &NodeId {
         &self.node_id
-    }
-
-    pub fn is_dir(&self) -> bool {
-        self.data.is_dir()
-    }
-
-    pub fn is_password(&self) -> bool {
-        self.data.is_password()
     }
 
     pub fn password(self) -> Option<Password> {
@@ -66,19 +63,16 @@ impl Entry {
 
 impl fmt::Debug for Entry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let kind = if self.is_dir() {
-            "Directory"
-        } else {
-            "Password"
-        };
+        let kind = self.kind().fmt(f);
         f.debug_struct("Entry")
-            .field("kind", &kind.to_string())
+            .field("kind", &kind)
             .field("name", &self.name().to_string())
             .field("path", &self.path().display().to_string())
             .finish()
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Traversal {
     None,
     Recursive,
@@ -110,19 +104,38 @@ impl<'a> MutEntry<'a> {
         self.data().path()
     }
 
-    pub fn is_dir(&self) -> bool {
-        self.data().is_dir()
-    }
-
-    pub fn is_password(&self) -> bool {
-        self.data().is_password()
+    pub fn kind(&self) -> EntryKind {
+        self.data().kind()
     }
 
     pub fn remove(self, traversal: Traversal) -> Result<(), StoreError> {
-        if self.data().is_password() {
-            self.mut_password().unwrap().remove()
-        } else {
-            self.mut_directory().unwrap().remove(traversal)
+        match self.kind() {
+            EntryKind::Directory => self.mut_directory().unwrap().remove(traversal),
+            _ => {
+                let path = self.path().to_owned();
+
+                fs::remove_file(&path).with_store_error("Could not remove password")?;
+                self.store
+                    .tree
+                    .remove_node(self.node_id, RemoveBehavior::DropChildren)
+                    .expect("Could not remove password from internal tree structure");
+
+                let root = self.store.location().to_owned();
+                if let Some(git) = self.store.git() {
+                    git.add(&[&path])
+                        .with_store_error("failed to add removal to git")?;
+                    git.commit(&format!(
+                        "Remove '{}' from store.",
+                        path.strip_prefix(root)
+                            .unwrap()
+                            .with_extension("")
+                            .display(),
+                    ))
+                        .with_store_error("failed to commit removal to git")?;
+                }
+
+                Ok(())
+            },
         }
     }
 
@@ -136,7 +149,7 @@ impl<'a> MutEntry<'a> {
             .with_store_error("Attempted to rename store's root directory")?;
         }
         let mut new_path = old_path.with_file_name(new_name.into());
-        if self.is_password() {
+        if self.kind() == EntryKind::Password {
             new_path = new_path.with_extension("gpg");
         }
         fs::rename(&old_path, &new_path).with_store_error("Failed to rename store entry")?;
@@ -144,6 +157,7 @@ impl<'a> MutEntry<'a> {
         let (name, path) = match self.data_mut() {
             PassNode::Password { name, path } => (name, path),
             PassNode::Directory { name, path } => (name, path),
+            PassNode::NormalFile { name, path } => (name, path),
         };
         *path = new_path.clone();
         *name = path.file_stem().unwrap().to_string_lossy().to_string();
@@ -176,7 +190,7 @@ impl<'a> MutEntry<'a> {
     pub fn copy_to(&mut self, _directory: &Directory) {}
 
     pub fn mut_password(self) -> Option<MutPassword<'a>> {
-        if self.is_password() {
+        if self.kind() == EntryKind::Password {
             Some(MutPassword::new(self.node_id, self.store))
         } else {
             None
@@ -184,7 +198,7 @@ impl<'a> MutEntry<'a> {
     }
 
     pub fn mut_directory(self) -> Option<MutDirectory<'a>> {
-        if self.is_dir() {
+        if self.kind() == EntryKind::Directory {
             Some(MutDirectory::new(self.node_id, self.store))
         } else {
             None
@@ -194,13 +208,9 @@ impl<'a> MutEntry<'a> {
 
 impl<'a> fmt::Debug for MutEntry<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let kind = if self.is_dir() {
-            "Directory"
-        } else {
-            "Password"
-        };
+        let kind = self.kind().fmt(f);
         f.debug_struct("MutEntry")
-            .field("kind", &kind.to_string())
+            .field("kind", &kind)
             .field("name", &self.name().to_string())
             .field("path", &self.path().display().to_string())
             .finish()

@@ -32,6 +32,38 @@ pub(crate) fn clone_index_entry(index_entry: &IndexEntry) -> IndexEntry {
     }
 }
 
+impl ConflictEntry {
+    fn from_index_entry(repo: &git2::Repository, maybe_index_entry: Option<IndexEntry>) -> Option<Self> {
+        if let Some(index_entry) = maybe_index_entry {
+            let content = repo.find_blob(index_entry.id).expect("Blob of conflict not in repo").content().to_vec();
+            let path = Path::new(OsStr::from_bytes(&index_entry.path)).to_owned();
+
+            Some(Self {
+                index_entry,
+                content,
+                path: path.clone(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+fn entry_has_extension(entry: &Option<ConflictEntry>, ext: &str) -> bool {
+    let path = if let Some(entry) = entry {
+        &entry.path
+    } else {
+        return false;
+    };
+
+    if let Some(path_ext) = path.extension().and_then(OsStr::to_str) {
+        path_ext == ext
+    } else {
+        false
+    }
+}
+
+
 impl Clone for ConflictEntry {
     fn clone(&self) -> Self {
         Self { index_entry: clone_index_entry(&self.index_entry), content: self.content.clone(), path: self.path.clone() }
@@ -62,14 +94,6 @@ impl<'a> std::fmt::Debug for ConflictResolver<'a> {
     }
 }
 
-fn path_has_extension(path: &Path, ext: &str) -> bool {
-    if let Some(path_ext) = path.extension().and_then(OsStr::to_str) {
-        path_ext == ext
-    } else {
-        false
-    }
-}
-
 impl<'a> ConflictResolver<'a> {
     pub(crate) fn new_without_conflicts(repo: &'a git2::Repository, finish_cb: impl FnOnce(&'a git2::Repository, Option<git2::Index>) -> GitResult<()> + 'a) -> Self {
         Self {
@@ -92,35 +116,14 @@ impl<'a> ConflictResolver<'a> {
         'conflicts:
         for conflict in index.conflicts()? {
             let conflict = conflict?;
-            let ancestor = conflict.ancestor.unwrap();
-            let our = conflict.our.unwrap();
-            let their = conflict.their.unwrap();
-            let ancestor_content = repo.find_blob(ancestor.id).expect("Blob of conflict not in repo").content().to_vec();
-            let ancestor_path = Path::new(OsStr::from_bytes(&ancestor.path)).to_owned();
-            let our_content = repo.find_blob(our.id).expect("Blob of conflict not in repo").content().to_vec();
-            let our_path = Path::new(OsStr::from_bytes(&our.path)).to_owned();
-            let their_content = repo.find_blob(their.id).expect("Blob of conflict not in repo").content().to_vec();
-            let their_path = Path::new(OsStr::from_bytes(&their.path)).to_owned();
 
-            let ancestor_entry = ConflictEntry {
-                index_entry: ancestor,
-                content: ancestor_content,
-                path: ancestor_path.clone(),
-            };
-            let our_entry = ConflictEntry {
-                index_entry: our,
-                content: our_content,
-                path: our_path.clone(),
-            };
-            let their_entry = ConflictEntry {
-                index_entry: their,
-                content: their_content,
-                path: their_path.clone(),
-            };
+            let ancestor_entry = ConflictEntry::from_index_entry(repo, conflict.ancestor);
+            let our_entry = ConflictEntry::from_index_entry(repo, conflict.our);
+            let their_entry = ConflictEntry::from_index_entry(repo, conflict.their);
 
-            if path_has_extension(&ancestor_path, "gpg") ||
-                path_has_extension(&our_path, "gpg") ||
-                path_has_extension(&their_path, "gpg")
+            if entry_has_extension(&ancestor_entry, "gpg") ||
+                entry_has_extension(&our_entry, "gpg") ||
+                entry_has_extension(&their_entry, "gpg")
             {
                 let conflicted_password_res = ConflictedPassword::new(ancestor_entry.clone(), our_entry.clone(), their_entry.clone());
                 if conflicted_password_res.is_some() {
@@ -129,9 +132,9 @@ impl<'a> ConflictResolver<'a> {
                 }
             }
 
-            if path_has_extension(&ancestor_path, "gpg-id") ||
-                path_has_extension(&our_path, "gpg-id") ||
-                path_has_extension(&their_path, "gpg-id")
+            if entry_has_extension(&ancestor_entry, "gpg-id") ||
+                entry_has_extension(&our_entry, "gpg-id") ||
+                entry_has_extension(&their_entry, "gpg-id")
             {
                 let conflicted_gpg_id = ConflictedGpgId::new(ancestor_entry.clone(), our_entry.clone(), their_entry.clone());
                 if conflicted_gpg_id.is_some() {

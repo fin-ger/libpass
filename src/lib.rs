@@ -28,6 +28,7 @@ pub use inserter::*;
 pub use matched_entries::*;
 pub use matched_passwords::*;
 pub(crate) use pass_node::*;
+pub use pass_node::EntryKind;
 pub use password::*;
 pub use store::*;
 pub use traversal::*;

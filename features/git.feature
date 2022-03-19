@@ -133,3 +133,149 @@ Feature: Git operations in the password store
     Then merge conflicts are manually resolved
     And the remote's commits are merged
     And the repository is clean
+
+  Scenario: Pull non-fast-forward changes from the git remote with manual merging and resolve merge conflict by letting the user resolve a binary conflict
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And the repository's remote contains new commits of a binary file
+    And a password store is opened
+    When the password store is successfully opened
+    And the binary file is edited
+    And changes are pulled from the remote
+    Then binary merge conflicts are manually resolved
+    And the remote's commits are merged
+    And the repository is clean
+
+  Scenario: Pull non-fast-forward changes from the git remote with manual merging and resolve merge conflict by letting the user resolve a plain text conflict
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And the repository's remote contains new commits of a text file
+    And a password store is opened
+    When the password store is successfully opened
+    And the text file is edited
+    And changes are pulled from the remote
+    Then plain text merge conflicts are manually resolved
+    And the remote's commits are merged
+    And the repository is clean
+
+  Scenario: Pull non-fast-forward changes from the git remote with manual merging and resolve merge conflict by letting the user resolve a gpg-id conflict
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And the repository's remote contains new commits changing the gpg-id
+    And a password store is opened
+    When the password store is successfully opened
+    And the gpg-id of the store is edited
+    And changes are pulled from the remote
+    Then gpg-id merge conflicts are manually resolved
+    And the remote's commits are merged
+    And the repository is clean
+
+  Scenario: Config is invalid when no git username is set
+    Given a password store exists
+    And the password store uses git
+    And the git username is not set
+    And a password store is opened
+    When the password store is successfully opened
+    Then the git config is invalid
+
+  Scenario: Config is invalid when no git email is set
+    Given a password store exists
+    And the password store uses git
+    And the git email is not set
+    And a password store is opened
+    When the password store is successfully opened
+    Then the git config is invalid
+
+  Scenario: Config is valid when git username and email are set
+    Given a password store exists
+    And the password store uses git
+    And a password store is opened
+    When the password store is successfully opened
+    Then the git config is valid
+
+  Scenario: Git username overridden in repository config
+    Given a password store exists
+    And the password store uses git
+    And a password store is opened
+    When the password store is successfully opened
+    And the username is overridden in the git config
+    Then the git username for this repository is changed
+
+  Scenario: Git email overridden in repository config
+    Given a password store exists
+    And the password store uses git
+    And a password store is opened
+    When the password store is successfully opened
+    And the email is overridden in the git config
+    Then the git email for this repository is changed
+
+  Scenario: Git username can be read from repository config
+    Given a password store exists
+    And the password store uses git
+    And a password store is opened
+    When the password store is successfully opened
+    Then the git username can be read from the repository config
+
+  Scenario: Git email can be read from repository config
+    Given a password store exists
+    And the password store uses git
+    And a password store is opened
+    When the password store is successfully opened
+    Then the git email can be read from the repository config
+
+  Scenario: Status of unchanged git repository is clean
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And a password store is opened
+    When the password store is successfully opened
+    Then the git status is clean
+
+  Scenario: Status of changed git repository contains commits ahead of remote
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And a password store is opened
+    When the password store is successfully opened
+    And a password is edited
+    Then the git status contains new commits
+
+  Scenario: Status of updated remote contains commits ahead of local branch
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And the repository's remote contains new commits
+    And a password store is opened
+    When the password store is successfully opened
+    And the repository's remote is fetched
+    Then the git status contains new commits on the remote
+
+  Scenario: Uncommitted files changed outside of this library are reported in status
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And a password store is opened
+    When the password store is successfully opened
+    And a file in the repository is changed outside of this library
+    Then the git status contains uncommitted changes
+
+  Scenario: Files changed outside of this library can be committed
+    Given a password store exists
+    And the password store uses git
+    And passwords are stored in the password store
+    And the repository has a remote
+    And a password store is opened
+    When the password store is successfully opened
+    And a file in the repository is changed outside of this library
+    And this file is committed with this library
+    Then the git status contains new commits

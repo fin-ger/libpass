@@ -16,7 +16,7 @@ use std::path::Path;
 pub use conflict_resolver::ConflictResolver;
 
 use custom_debug::Debug;
-use git2::{AnnotatedCommit, AutotagOption, Config, ErrorClass, ErrorCode, FetchOptions, IndexAddOption, ObjectType, Reference, Repository, StatusOptions, build::CheckoutBuilder};
+use git2::{AnnotatedCommit, AutotagOption, Config, ConfigLevel, ErrorClass, ErrorCode, FetchOptions, IndexAddOption, ObjectType, Reference, Repository, StatusOptions, build::CheckoutBuilder};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone)]
@@ -212,7 +212,7 @@ impl Git {
         let idx = self.repo.merge_trees(&ancestor, &local_tree, &remote_tree, None)?;
 
         ConflictResolver::from_index(idx, &self.repo, move |repo, idx| {
-            let mut idx = idx.unwrap();
+            let mut idx = idx.expect("Index not set");
             if idx.has_conflicts() {
                 return Err(git2::Error::new(git2::ErrorCode::Conflict, git2::ErrorClass::Merge, "Not all conflicts resolved"));
             }
@@ -323,7 +323,7 @@ impl Git {
         Ok(GitStatuses::new_from(statuses))
     }
 
-    pub(crate) fn commit<M: Into<String>>(&mut self, message: M) -> GitResult<()> {
+    pub fn commit<M: Into<String>>(&mut self, message: M) -> GitResult<()> {
         let me = self.repo.signature()?;
         let tree_id = self.repo.index()?.write_tree()?;
         let tree = self.repo.find_tree(tree_id)?;
@@ -346,7 +346,7 @@ impl Git {
         Ok(())
     }
 
-    pub(crate) fn add(&mut self, paths: &[&Path]) -> GitResult<()> {
+    pub fn add(&mut self, paths: &[&Path]) -> GitResult<()> {
         let workdir = self.repo.workdir().unwrap();
         for path in paths {
             let relative = path.strip_prefix(workdir).unwrap();
@@ -421,19 +421,29 @@ impl Git {
         has_email && has_name
     }
 
-    pub fn config_set_user_name(&mut self, _name: &str) -> GitResult<()> {
+    pub fn config_set_user_name(&mut self, name: &str) -> GitResult<()> {
+        // only store config for this repository
+        let mut config = Config::new()?.open_level(ConfigLevel::Local)?;
+        config.set_str("user.name", name)?;
         Ok(())
     }
 
-    pub fn config_user_name(&mut self) -> GitResult<Option<String>> {
-        Ok(None)
+    pub fn config_user_name(&mut self) -> GitResult<String> {
+        let config = Config::open_default()?;
+        let name = config.get_string("user.name")?;
+        Ok(name)
     }
 
-    pub fn config_set_user_email(&mut self, _email: &str) -> GitResult<()> {
+    pub fn config_set_user_email(&mut self, email: &str) -> GitResult<()> {
+        // only store config for this repository
+        let mut config = Config::new()?.open_level(ConfigLevel::Local)?;
+        config.set_str("user.email", email)?;
         Ok(())
     }
 
-    pub fn config_user_email(&mut self) -> GitResult<Option<String>> {
-        Ok(None)
+    pub fn config_user_email(&mut self) -> GitResult<String> {
+        let config = Config::open_default()?;
+        let email = config.get_string("user.email")?;
+        Ok(email)
     }
 }

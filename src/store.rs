@@ -106,6 +106,14 @@ impl Store {
         }
     }
 
+    fn is_password(path: &Path) -> bool {
+        if let Some(ext) = path.extension() {
+            ext == "gpg"
+        } else {
+            false
+        }
+    }
+
     fn load_passwords_from_dir(&mut self, dir: &Path, parent: &NodeId) {
         let (read_dir, errors) = match fs::read_dir(dir).with_store_error(dir.display().to_string())
         {
@@ -145,7 +153,7 @@ impl Store {
                         // this only triggers when the path is ".." and can therefore be ignored
                     }
                 }
-            } else if !Self::is_special_entry(&path) {
+            } else if !Self::is_special_entry(&path) && Self::is_password(&path) {
                 match path.file_stem() {
                     Some(name) => {
                         let _pw_id = self
@@ -161,11 +169,22 @@ impl Store {
                     }
                     None => {
                         // this only triggers when the path is "..":
-                        //   if the filename has not stem (no dot) then the whole filename is used
-                        //   if the filename start with a dot then the whole filename is used
+                        //   if the filename has no stem (no dot) then the whole filename is used
+                        //   if the filename starts with a dot then the whole filename is used
                         //  therefore this can be ignored.
                     }
                 }
+            } else if !Self::is_special_entry(&path) && !Self::is_password(&path) {
+                let _f_id = self
+                    .tree
+                    .insert(
+                        Node::new(PassNode::NormalFile {
+                            name: path.file_name().expect("Path terminated with ...! Looks like your directory structure is too deep. If you are willing to implement a fix, please don't hesitate to do so. I have no interest in fixing this. To workaround this problem just use less folders.").to_string_lossy().to_string(),
+                            path,
+                        }),
+                        InsertBehavior::UnderNode(parent),
+                    )
+                    .expect("Failed to insert normal file into internal tree");
             }
         }
 

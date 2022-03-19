@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use bitflags::bitflags;
 use id_tree::Node;
 
-use crate::PassNode;
+use crate::{PassNode, EntryKind};
 
 bitflags! {
     pub struct Sorting: u8 {
@@ -18,9 +18,9 @@ impl Sorting {
         let sort_dirs = self.contains(Sorting::DIRECTORIES_FIRST);
         let sort_alpha = self.contains(Sorting::ALPHABETICAL);
 
-        if sort_dirs && a.data().is_dir() && !b.data().is_dir() {
+        if sort_dirs && a.data().kind() == EntryKind::Directory && b.data().kind() != EntryKind::Directory {
             Ordering::Less
-        } else if sort_dirs && !a.data().is_dir() && b.data().is_dir() {
+        } else if sort_dirs && a.data().kind() != EntryKind::Directory && b.data().kind() == EntryKind::Directory {
             Ordering::Greater
         } else if sort_alpha {
             let a_low = a.data().name().to_lowercase();
