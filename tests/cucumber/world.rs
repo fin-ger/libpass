@@ -121,6 +121,11 @@ pub enum IncrementalWorld {
         store: AssertUnwindSafe<Store>,
         envs: HashMap<String, String>,
     },
+    TextConflictManuallyResolved {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        envs: HashMap<String, String>,
+    },
 }
 
 #[async_trait(?Send)]

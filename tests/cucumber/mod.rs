@@ -91,15 +91,19 @@ fn initialize_pgp_home(home: &Path) -> anyhow::Result<()> {
         "default",
         Duration::from_secs(0),
         CreateKeyFlags::SIGN | CreateKeyFlags::ENCR | CreateKeyFlags::NOEXPIRE,
-    )
-    .context("Failed to create GPG key")?;
+    ).context("Failed to create GPG key")?;
     ctx.create_key_with_flags(
         "Test Key 2 <test2@key.email>",
         "default",
         Duration::from_secs(0),
         CreateKeyFlags::SIGN | CreateKeyFlags::ENCR | CreateKeyFlags::NOEXPIRE,
-    )
-    .context("Failed to create GPG key")?;
+    ).context("Failed to create GPG key")?;
+    ctx.create_key_with_flags(
+        "Test Key 3 <test3@key.email>",
+        "default",
+        Duration::from_secs(0),
+        CreateKeyFlags::SIGN | CreateKeyFlags::ENCR | CreateKeyFlags::NOEXPIRE,
+    ).context("Failed to create GPG key")?;
     let key = ctx.get_secret_key("test@key.email")?;
     let keygrip = key.subkeys().next().unwrap().keygrip().unwrap();
 

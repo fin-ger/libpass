@@ -453,3 +453,230 @@ fn the_repositorys_remote_contains_new_commits_of_a_binary_file(world: &mut Incr
         panic!("World state is not Prepared!");
     }
 }
+
+#[given("the repository's remote contains new commits of a text file")]
+fn the_repositorys_remote_contains_new_commits_of_a_text_file(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, home, .. } = world {
+        let password_store_dir = if let Ok(path) = std::env::var("PASSWORD_STORE_DIR") {
+            path.into()
+        } else if let Some(path) = envs.get("PASSWORD_STORE_DIR") {
+            path.into()
+        } else {
+            home.path().join(".password-store")
+        };
+        let password_store_remote = home.path().join("password-store-remote");
+
+        let password_store_remote_temp_checkout = tempfile::Builder::new()
+            .prefix("libpass-remote-temp-checkout_")
+            .tempdir()
+            .expect("Failed to create temporary checkout directory");
+
+        let status = Command::new("git")
+            .arg("clone")
+            .arg(&password_store_remote)
+            .arg(
+                &password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .envs(envs.clone())
+            .status()
+            .expect("Failed to prepare temporary checkout");
+        assert!(status.success(), "Failed to prepare temporary checkout");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.name", "Remote User"])
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set username in git config");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.email", "remote@key.email"])
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set email in git config");
+
+        let content = "raising elephants is so utterly boring";
+        let text_file_path = password_store_remote_temp_checkout.path()
+            .join("Manufacturers/Sokor-Greeting");
+        let mut text_file = File::create(&text_file_path).expect("Failed to create text file");
+        text_file.write_all(content.as_bytes()).expect("Failed to write to text file");
+
+        let status = Command::new("git")
+            .arg("add")
+            .arg(text_file_path)
+            .envs(envs.clone())
+            .current_dir(&password_store_remote_temp_checkout)
+            .status()
+            .expect("Failed to add text file to git");
+        assert!(
+            status.success(),
+            "Failed to add text file to git"
+        );
+
+        let status = Command::new("git")
+            .arg("commit")
+            .arg("-m")
+            .arg("Add 'Manufacturers/Sokor-Greeting' text file to store")
+            .envs(envs.clone())
+            .current_dir(&password_store_remote_temp_checkout)
+            .status()
+            .expect("Failed to commit text file to git");
+        assert!(
+            status.success(),
+            "Failed to commit text file to git"
+        );
+
+        let output = Command::new("pass")
+            .arg("git")
+            .arg("push")
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .output()
+            .expect("Failed to push changes to remote!");
+        assert!(output.status.success(), "Failed to push changes to remote!");
+
+        let status = Command::new("git")
+            .arg("fetch")
+            .envs(envs.clone())
+            .current_dir(&password_store_dir)
+            .status()
+            .expect("failed to git fetch from remote");
+        assert!(
+            status.success(),
+            "Failed to fetch from the repository's remote"
+        );
+    } else {
+        panic!("World state is not Prepared!");
+    }
+}
+
+#[given("the repository's remote contains new commits changing the gpg-id")]
+fn the_repositorys_remote_contains_new_commits_changing_the_gpg_id(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, home, .. } = world {
+        let password_store_dir = if let Ok(path) = std::env::var("PASSWORD_STORE_DIR") {
+            path.into()
+        } else if let Some(path) = envs.get("PASSWORD_STORE_DIR") {
+            path.into()
+        } else {
+            home.path().join(".password-store")
+        };
+        let password_store_remote = home.path().join("password-store-remote");
+
+        let password_store_remote_temp_checkout = tempfile::Builder::new()
+            .prefix("libpass-remote-temp-checkout_")
+            .tempdir()
+            .expect("Failed to create temporary checkout directory");
+
+        let status = Command::new("git")
+            .arg("clone")
+            .arg(&password_store_remote)
+            .arg(
+                &password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .envs(envs.clone())
+            .status()
+            .expect("Failed to prepare temporary checkout");
+        assert!(status.success(), "Failed to prepare temporary checkout");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.name", "Remote User"])
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set username in git config");
+
+        let status = Command::new("pass")
+            .args(&["git", "config", "user.email", "remote@key.email"])
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to set email in git config");
+
+        let output = Command::new("pass")
+            .args(&["init", "test@key.email", "test2@key.email"])
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .output()
+            .expect("Failed to add new key to password store");
+        assert!(output.status.success(), "Failed to add new key to password store!");
+
+        let output = Command::new("pass")
+            .arg("git")
+            .arg("push")
+            .envs(envs.clone())
+            .env(
+                "PASSWORD_STORE_DIR",
+                password_store_remote_temp_checkout
+                    .path()
+                    .display()
+                    .to_string(),
+            )
+            .output()
+            .expect("Failed to push changes to remote!");
+        assert!(output.status.success(), "Failed to push changes to remote!");
+
+        let status = Command::new("git")
+            .arg("fetch")
+            .envs(envs.clone())
+            .current_dir(&password_store_dir)
+            .status()
+            .expect("failed to git fetch from remote");
+        assert!(
+            status.success(),
+            "Failed to fetch from the repository's remote"
+        );
+    } else {
+        panic!("World state is not Prepared!");
+    }
+}

@@ -472,7 +472,7 @@ fn binary_merge_conflicts_are_manually_resolved(world: &mut IncrementalWorld) {
             for conflicted_binary in conflicted_binaries.iter_mut() {
                 let resolved = conflicted_binary.our_content().iter()
                     .chain(conflicted_binary.their_content().iter())
-                    .chain(conflicted_binary.our_content().iter())
+                    .chain(conflicted_binary.ancestor_content().iter())
                     .next()
                     .expect("No content available for resolution!")
                     .to_vec();
@@ -485,6 +485,44 @@ fn binary_merge_conflicts_are_manually_resolved(world: &mut IncrementalWorld) {
         let store = AssertUnwindSafe(resolving_store.0.into_heads().store);
 
         *world = IncrementalWorld::BinaryConflictManuallyResolved {
+            home,
+            store,
+            envs,
+        };
+    } else {
+        panic!("World state is not Pulled!");
+    }
+}
+
+#[then("plain text merge conflicts are manually resolved")]
+fn plain_text_merge_conflicts_are_manually_resolved(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Pulled { mut resolving_store, envs, home, .. } = prev {
+        resolving_store.with_resolver_mut(|wrapped_resolver| {
+            let mut resolver = wrapped_resolver.take().unwrap();
+            assert!(resolver.conflicted_gpg_ids().is_empty(), "conflicted_gpg_ids is not empty!");
+            assert!(resolver.conflicted_binaries().is_empty(), "conflicted_binaries is not empty!");
+            assert!(resolver.conflicted_passwords().is_empty(), "conflicted_passwords is not empty!");
+            let mut conflicted_plain_texts = resolver.conflicted_plain_texts();
+            assert_eq!(conflicted_plain_texts.len(), 1, "Not exactly one conflicted plain text!");
+            for conflicted_text in conflicted_plain_texts.iter_mut() {
+                let resolved = conflicted_text.our_content().iter()
+                    .chain(conflicted_text.their_content().iter())
+                    .chain(conflicted_text.ancestor_content().iter())
+                    .next()
+                    .expect("No content available for resolution!")
+                    .to_string();
+
+                conflicted_text.resolve(&mut resolver, Some(&resolved)).expect("Could not resolve conflict");
+            }
+
+            resolver.finish().expect("Failed to finish resolving merge conflicts");
+        });
+        let store = AssertUnwindSafe(resolving_store.0.into_heads().store);
+
+        *world = IncrementalWorld::TextConflictManuallyResolved {
             home,
             store,
             envs,
@@ -587,6 +625,29 @@ fn the_remotes_commits_are_merged(world: &mut IncrementalWorld) {
                                 |\\  \n\
                                 | * [Remote User] Add 'Manufacturers/Sokor-Starmap' binary file to store\n\
                                 * | [Test User] Add 'Manufacturers/Sokor-Starmap' to store\n\
+                                |/  \n\
+                                * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
+                                * [Test User] Add given password for Manufacturers/Sokor to store.\n\
+                                * [Test User] Add given password for Manufacturers/StrutCo to store.\n\
+                                * [Test User] Add given password for Phone to store.\n\
+                                * [Test User] Add given password for Manufacturers/Yoyodyne to store.\n\
+                                * [Test User] Configure git repository for gpg file diff.\n\
+                                * [Test User] Add current contents of password store.");
+            *world = IncrementalWorld::Successful { home, store, envs };
+        },
+        IncrementalWorld::TextConflictManuallyResolved { envs, home, store } => {
+            let output = Command::new("pass")
+                .args(&["git", "log", "--pretty=format:[%an] %s", "--graph"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .output()
+                .expect("Could not check git commit");
+            let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
+
+            assert_eq!(stdout, "*   [Test User] Merge origin/main into main\n\
+                                |\\  \n\
+                                | * [Remote User] Add 'Manufacturers/Sokor-Greeting' text file to store\n\
+                                * | [Test User] Add 'Manufacturers/Sokor-Greeting' to store\n\
                                 |/  \n\
                                 * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
                                 * [Test User] Add given password for Manufacturers/Sokor to store.\n\
@@ -849,6 +910,69 @@ fn the_binary_file_is_edited(world: &mut IncrementalWorld) {
         panic!("World state is not Successful!");
     }
 }
+
+#[when("the text file is edited")]
+fn the_text_file_is_edited(world: &mut IncrementalWorld) {
+    use std::fs::File;
+    use std::io::Write;
+
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful {
+        mut store,
+        home,
+        envs,
+    } = prev
+    {
+        let content = "reboot even if system utterly broken";
+        let text_file_path = store.location().join("Manufacturers/Sokor-Greeting");
+        let mut text_file = File::create(&text_file_path).expect("Failed to create text file");
+        text_file.write_all(content.as_bytes()).expect("Failed to write to text file");
+
+        let git = store.git().expect("Store not using git");
+        git.add(&[&text_file_path]).expect("Failed to add text file to git");
+        git.commit("Add 'Manufacturers/Sokor-Greeting' to store").expect("Failed to commit text file to git");
+
+        *world = IncrementalWorld::Successful {
+            store,
+            home,
+            envs,
+        };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("the gpg-id of the store is edited")]
+fn the_gpg_id_of_the_store_is_edited(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful {
+        mut store,
+        home,
+        envs,
+    } = prev
+    {
+        let root = store
+            .show(".", TraversalOrder::PreOrder).expect("Root directory not found")
+            .next().expect("Root directory not found")
+            .directory().expect("Not a directory");
+
+        root.make_mut(&mut store)
+            .add_gpg_id("test3@key.email").expect("Could not add new gpg-id");
+
+        *world = IncrementalWorld::Successful {
+            store,
+            home,
+            envs,
+        };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
 #[when("a directory is created")]
 fn a_directory_is_created(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { ref mut store, .. } = world {

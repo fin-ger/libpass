@@ -188,19 +188,19 @@ impl<'a> MutDirectory<'a> {
         todo!();
     }*/
 
-    pub fn add_gpg_id(&self, _gpg_id: &str) {
+    pub fn add_gpg_id(&self, _gpg_id: &str) -> Result<(), ()> {
         todo!();
     }
 
-    pub fn remove_gpg_id(&self, _gpg_id: &str) {
+    pub fn remove_gpg_id(&self, _gpg_id: &str) -> Result<(), ()> {
         todo!();
     }
 
-    pub fn clear_gpg_ids(&self, _gpg_id: &str) {
+    pub fn clear_gpg_ids(&self, _gpg_id: &str) -> Result<(), ()> {
         todo!();
     }
 
-    pub fn set_gpg_ids(&self, _gpg_ids: Vec<&str>) {
+    pub fn set_gpg_ids(&self, _gpg_ids: Vec<&str>) -> Result<(), ()> {
         todo!();
     }
 
