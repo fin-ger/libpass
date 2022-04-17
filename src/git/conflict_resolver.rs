@@ -58,6 +58,8 @@ fn entry_has_extension(entry: &Option<ConflictEntry>, ext: &str) -> bool {
 
     if let Some(path_ext) = path.extension().and_then(OsStr::to_str) {
         path_ext == ext
+    } else if let Some(path) = path.file_name().and_then(OsStr::to_str) {
+        path == format!(".{}", ext)
     } else {
         false
     }

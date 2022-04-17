@@ -107,12 +107,16 @@ impl ConflictedGpgId {
             .clone();
 
         if let Some(resolved_gpg_ids) = resolved_gpg_ids {
-            // FIXME: re-encrypt all passwords this gpg-id controls
+            // passwords are not re-encrypted, as there might exist passwords
+            // which contain changes unrelated to the gpg-id change. We don't
+            // want to overwrite those changes and therefore leave re-encrypting
+            // up to the user. Usually, this is intuitively done, as a gpg-id
+            // change commit also contains already re-encrypted passwords.
+            // Therefore, all passwords will have a conflict and must therefore
+            // be handled by the user.
             let resolved_content = resolved_gpg_ids.iter()
                 .map(|key| {
-                    key.get_key()
-                        .id().expect("GPG key id not valid utf-8")
-                        .to_owned()
+                    key.id().to_owned()
                 })
                 .reduce(|res, key_id| format!("{}\n{}", res, key_id))
                 .unwrap_or(String::new());

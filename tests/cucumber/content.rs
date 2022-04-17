@@ -2,7 +2,7 @@ use std::panic::AssertUnwindSafe;
 use std::process::{Command, Stdio};
 
 use cucumber::{then, when};
-use pass::{GitRemote, Store};
+use pass::{GitRemote, Store, GpgKeyId};
 use pass::{Traversal, TraversalOrder, PasswordChange, EntryKind};
 
 use crate::world::{IncrementalWorld, ResolvingStoreBuilder};
@@ -532,6 +532,72 @@ fn plain_text_merge_conflicts_are_manually_resolved(world: &mut IncrementalWorld
     }
 }
 
+#[then("gpg-id merge conflicts are manually resolved")]
+fn gpg_id_merge_conflicts_are_manually_resolved(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Pulled { mut resolving_store, envs, home, .. } = prev {
+        resolving_store.with_resolver_mut(|wrapped_resolver| {
+            let mut resolver = wrapped_resolver.take().unwrap();
+            assert!(resolver.conflicted_plain_texts().is_empty(), "conflicted_plain_texts is not empty!");
+            assert!(resolver.conflicted_binaries().is_empty(), "conflicted_binaries is not empty!");
+            let mut conflicted_gpg_ids = resolver.conflicted_gpg_ids();
+            let mut conflicted_passwords = resolver.conflicted_passwords();
+            assert_eq!(conflicted_gpg_ids.len(), 1, "Not exactly one conflicted gpg-id!");
+            assert_eq!(conflicted_passwords.len(), 5, "Not exactly 5 conflicted passwords!");
+
+            for conflicted_gpg_id in conflicted_gpg_ids.iter_mut() {
+                let ours = conflicted_gpg_id.our_key_ids().expect("No key ids provided by us");
+                let theirs = conflicted_gpg_id.their_key_ids().expect("No key ids provided by them");
+
+                assert!(ours.intersection(&theirs).count() == 1, "More than one key-id difference");
+
+                let resolved: std::collections::HashSet<_> = ours.union(&theirs).map(Clone::clone).collect();
+
+                conflicted_gpg_id.resolve(&mut resolver, Some(&resolved))
+                    .expect("Could not resolve conflict");
+            }
+
+            for conflicted_password in conflicted_passwords.iter_mut() {
+                let ancestor = conflicted_password.ancestor_password().expect("No ancestor password found");
+                let their = conflicted_password.their_password().expect("No their password found");
+                let our = conflicted_password.our_password().expect("No our password found");
+
+                assert!(
+                    ancestor.diff(&their).iter()
+                        .all(|change| matches!(change, PasswordChange::Equal(..))),
+                    "Ancestor and their not equal",
+                );
+                assert!(
+                    ancestor.diff(&our).iter()
+                        .all(|change| matches!(change, PasswordChange::Equal(..))),
+                    "Ancestor and our not equal",
+                );
+                assert!(
+                    their.diff(&our).iter()
+                        .all(|change| matches!(change, PasswordChange::Equal(..))),
+                    "Their and our not equal",
+                );
+
+                conflicted_password.resolve(&mut resolver, Some(our))
+                    .expect("Failed to resolve reencrypted password conflict");
+            }
+
+            resolver.finish().expect("Failed to finish resolving merge conflicts");
+        });
+        let store = AssertUnwindSafe(resolving_store.0.into_heads().store);
+
+        *world = IncrementalWorld::GpgIdConflictManuallyResolved {
+            home,
+            store,
+            envs,
+        };
+    } else {
+        panic!("World state is not Pulled!");
+    }
+}
+
 #[then("the remote's commits are fast-forwarded")]
 fn the_remotes_commits_are_fast_forwarded(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
@@ -648,6 +714,35 @@ fn the_remotes_commits_are_merged(world: &mut IncrementalWorld) {
                                 |\\  \n\
                                 | * [Remote User] Add 'Manufacturers/Sokor-Greeting' text file to store\n\
                                 * | [Test User] Add 'Manufacturers/Sokor-Greeting' to store\n\
+                                |/  \n\
+                                * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
+                                * [Test User] Add given password for Manufacturers/Sokor to store.\n\
+                                * [Test User] Add given password for Manufacturers/StrutCo to store.\n\
+                                * [Test User] Add given password for Phone to store.\n\
+                                * [Test User] Add given password for Manufacturers/Yoyodyne to store.\n\
+                                * [Test User] Configure git repository for gpg file diff.\n\
+                                * [Test User] Add current contents of password store.");
+            *world = IncrementalWorld::Successful { home, store, envs };
+        },
+        IncrementalWorld::GpgIdConflictManuallyResolved { envs, home, store } => {
+            let output = Command::new("pass")
+                .args(&["git", "log", "--pretty=format:[%an] %s", "--graph"])
+                .envs(envs.clone())
+                .stdout(Stdio::piped())
+                .output()
+                .expect("Could not check git commit");
+            let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
+
+            assert_eq!(stdout, "*   [Test User] Merge origin/main into main\n\
+                                |\\  \n\
+                                | * [Remote User] Reencrypt password store using new GPG id test@key.email, test2@key.email.\n\
+                                | * [Remote User] Set GPG id to test@key.email, test2@key.email.\n\
+                                * | [Test User] Reencrypt 'Manufacturers/Yoyodyne' as gpg-ids changed to test@key.email, test3@key.email.\n\
+                                * | [Test User] Reencrypt 'Manufacturers/StrutCo' as gpg-ids changed to test@key.email, test3@key.email.\n\
+                                * | [Test User] Reencrypt 'Manufacturers/Sokor' as gpg-ids changed to test@key.email, test3@key.email.\n\
+                                * | [Test User] Reencrypt 'Phone' as gpg-ids changed to test@key.email, test3@key.email.\n\
+                                * | [Test User] Reencrypt 'Entertainment/Holo Deck/Broht & Forrester' as gpg-ids changed to test@key.email, test3@key.email.\n\
+                                * | [Test User] Main GPG IDs for store set to test@key.email, test3@key.email.\n\
                                 |/  \n\
                                 * [Test User] Add given password for Entertainment/Holo Deck/Broht & Forrester to store.\n\
                                 * [Test User] Add given password for Manufacturers/Sokor to store.\n\
@@ -961,7 +1056,10 @@ fn the_gpg_id_of_the_store_is_edited(world: &mut IncrementalWorld) {
             .directory().expect("Not a directory");
 
         root.make_mut(&mut store)
-            .add_gpg_id("test3@key.email").expect("Could not add new gpg-id");
+            .add_gpg_id(
+                GpgKeyId::new("test3@key.email")
+                    .expect("GPG key id test@key.email does not exist")
+            ).expect("Could not add new gpg-id");
 
         *world = IncrementalWorld::Successful {
             store,

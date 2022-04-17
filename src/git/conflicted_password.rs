@@ -200,7 +200,6 @@ impl ConflictedPassword {
 #[derive(Debug, Clone)]
 pub struct ConflictedDecryptedPassword {
     lines: Vec<String>,
-    recipients: Vec<String>,
     path: PathBuf,
 }
 
@@ -218,11 +217,7 @@ impl ConflictedDecryptedPassword {
         let mut ctx = gpgme::Context::from_protocol(gpgme::Protocol::OpenPgp)?;
         let mut decrypted = Vec::new();
         // TODO: Add passphrase provider
-        let recipients = ctx.decrypt(content, &mut decrypted)?
-            .recipients()
-            .map(|recp| recp.key_id().expect("Key id not valid utf-8").to_owned())
-            .collect();
-
+        ctx.decrypt(content, &mut decrypted)?;
         let lines = String::from_utf8_lossy(&decrypted)
             .lines()
             .map(|line| line.to_owned())
@@ -230,7 +225,6 @@ impl ConflictedDecryptedPassword {
 
         Ok(Self {
             lines,
-            recipients,
             path: path.to_owned(),
         })
     }

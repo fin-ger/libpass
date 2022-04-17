@@ -169,7 +169,7 @@ impl DecryptedPassword {
         Ok(me)
     }
 
-    fn save(&mut self, summary: Option<String>, store: &mut Store) -> Result<(), StoreError> {
+    pub(crate) fn save(&mut self, summary: Option<String>, store: &mut Store) -> Result<(), StoreError> {
         let changes = std::mem::replace(&mut self.changes, Vec::new());
         save_password_to_file(store, &self.path, &self, summary, changes)?;
         Ok(())
