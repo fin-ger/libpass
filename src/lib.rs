@@ -11,6 +11,7 @@ mod pass_node;
 mod password;
 mod store;
 mod traversal;
+pub(crate) mod util;
 
 #[cfg(feature = "passphrase-utils")]
 pub mod passphrase_utils;

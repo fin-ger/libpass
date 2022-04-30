@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 
-use cucumber::given;
+use cucumber::{given, when};
 
 use crate::world::IncrementalWorld;
 
@@ -679,4 +679,64 @@ fn the_repositorys_remote_contains_new_commits_changing_the_gpg_id(world: &mut I
     } else {
         panic!("World state is not Prepared!");
     }
+}
+
+#[given("the git username is not set")]
+fn the_git_username_is_not_set(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, .. } = world {
+        let status = Command::new("git")
+            .args(&["config", "--global", "--unset", "user.name"])
+            .envs(envs.clone())
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to unset username in git config");
+    } else {
+        panic!("World state is not Prepared!");
+    }
+}
+
+#[given("the git email is not set")]
+fn the_git_email_is_not_set(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Prepared { envs, .. } = world {
+        let status = Command::new("git")
+            .args(&["config", "--global", "--unset", "user.email"])
+            .envs(envs.clone())
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to unset email in git config");
+    } else {
+        panic!("World state is not Prepared!");
+    }
+}
+
+#[when("a file in the repository is changed outside of this library")]
+fn a_file_in_the_repository_is_changed_outside_of_this_library(world: &mut IncrementalWorld) {
+    let store = match world {
+        IncrementalWorld::Successful { store, .. } => store,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let location = store.location();
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(location.join("SneakyRomulanIntruder"))
+        .expect("failed to create file");
+    file.write_all("Oh noes, u found me!".as_bytes()).expect("failed to write file");
+}
+
+#[when("this file is committed with this library")]
+fn this_file_is_committed_with_this_library(world: &mut IncrementalWorld) {
+    let store = match world {
+        IncrementalWorld::Successful { store, .. } => store,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let path = store.location().join("SneakyRomulanIntruder");
+    let git = store.git().expect("store does not use git");
+    git.add(&[&path]).expect("could not add file to git");
+    git.commit("Let the Romulan intruder in").expect("failed to commit to git");
 }

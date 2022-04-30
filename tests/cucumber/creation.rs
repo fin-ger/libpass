@@ -418,6 +418,18 @@ fn password_store_is_successfully(world: &mut IncrementalWorld) {
     }
 }
 
+#[when("the repository's remote is fetched")]
+fn the_repositorys_remote_is_fetched(world: &mut IncrementalWorld) {
+    let store = match world {
+        IncrementalWorld::Successful { store, .. } => store,
+        _ => panic!("World state is invalid!"),
+    };
+
+    store
+        .git().expect("store is not using git")
+        .fetch().expect("failed to fetch remote");
+}
+
 #[then(regex = "the (.*) of the password store fails")]
 fn the_operation_of_the_password_store_fails(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe

@@ -2,7 +2,7 @@ use std::panic::AssertUnwindSafe;
 use std::process::{Command, Stdio};
 
 use cucumber::{then, when};
-use pass::{GitRemote, Store, GpgKeyId};
+use pass::{GitRemote, Store, GpgKeyId, BranchStatus};
 use pass::{Traversal, TraversalOrder, PasswordChange, EntryKind};
 
 use crate::world::{IncrementalWorld, ResolvingStoreBuilder};
@@ -1248,4 +1248,199 @@ fn changes_are_pulled_from_the_remote(world: &mut IncrementalWorld) {
         home,
         envs,
     };
+}
+
+#[when("the username is overridden in the git config")]
+fn the_username_is_overridden_in_the_git_config(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { ref mut store, .. } = world {
+        store
+            .git().expect("store does not use git")
+            .config().expect("could not get git config")
+            .set_str("user.name", "Dynamic Test User").expect("could not set username in git");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("the email is overridden in the git config")]
+fn the_email_is_overridden_in_the_git_config(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { ref mut store, .. } = world {
+        store
+            .git().expect("store does not use git")
+            .config().expect("could not get git config")
+            .set_str("user.email", "dynamic.test@key.email").expect("could not set email in git");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[then("the git username can be read from the repository config")]
+fn the_git_username_can_be_read_from_the_repository_config(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { ref mut store, .. } = world {
+        let username = store
+            .git().expect("store does not use git")
+            .config().expect("could not get git config")
+            .get_string("user.name").expect("could not get username from git");
+        assert_eq!(username, "Test User");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[then("the git email can be read from the repository config")]
+fn the_git_email_can_be_read_from_the_repository_config(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { ref mut store, .. } = world {
+        let email = store
+            .git().expect("store does not use git")
+            .config().expect("could not get git config")
+            .get_string("user.email").expect("could not get user email from git");
+        assert_eq!(email, "test@key.email");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[then("the git config is valid")]
+fn the_git_config_is_valid(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { ref mut store, .. } = world {
+        let config_valid = store
+            .git().expect("store does not use git")
+            .config_valid();
+        assert!(
+            config_valid,
+            "the git config should be valid: {}, {}",
+            store.git().unwrap().config().unwrap().get_entry("user.name").unwrap().value().unwrap(),
+            store.git().unwrap().config().unwrap().get_entry("user.email").unwrap().value().unwrap(),
+        );
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[then("the git config is invalid")]
+fn the_git_config_is_invalid(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { ref mut store, .. } = world {
+        let config_valid = store
+            .git().expect("store does not use git")
+            .config_valid();
+        assert!(!config_valid, "the git config should be invalid");
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[then("the git username for this repository is changed")]
+fn the_git_username_for_this_repository_is_changed(world: &mut IncrementalWorld) {
+    let envs = match world {
+        IncrementalWorld::Successful { envs, .. } => envs,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let output = Command::new("pass")
+        .args(&["git", "config", "user.name"])
+        .envs(envs.clone())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Could not get git username");
+    let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
+    assert_eq!(stdout, "Dynamic Test User\n", "Username is not changed!");
+}
+
+#[then("the git email for this repository is changed")]
+fn the_git_email_for_this_repository_is_changed(world: &mut IncrementalWorld) {
+    let envs = match world {
+        IncrementalWorld::Successful { envs, .. } => envs,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let output = Command::new("pass")
+        .args(&["git", "config", "user.email"])
+        .envs(envs.clone())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Could not get git email");
+    let stdout = String::from_utf8(output.stdout).expect("Could not read stdout as UTF-8");
+    assert_eq!(stdout, "dynamic.test@key.email\n", "Email is not changed!");
+}
+
+#[then("the git status is clean")]
+fn the_git_status_is_clean(world: &mut IncrementalWorld) {
+    let store = match world {
+        IncrementalWorld::Successful { store, .. } => store,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let status = store
+        .git().expect("store is not using git")
+        .status().expect("failed to get git status");
+    assert!(status.is_clean(), "git status is not clean!");
+}
+
+#[then("the git status contains new commits")]
+fn the_git_status_contains_new_commits(world: &mut IncrementalWorld) {
+    let store = match world {
+        IncrementalWorld::EditedPassword { store, .. } => store,
+        IncrementalWorld::Successful { store, .. } => store,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let status = store
+        .git().expect("store is not using git")
+        .status().expect("failed to get git status");
+    assert!(status.conflicts.is_empty(), "conflicts is not empty");
+    assert!(status.workdir.is_empty(), "workdir is not empty");
+    assert!(status.staging.is_empty(), "staging is not empty");
+    assert_eq!(
+        status.branches,
+        vec![
+            BranchStatus {
+                branch: "main".to_owned(),
+                commits_behind_remote: 0,
+                commits_ahead_of_remote: 1,
+            },
+        ],
+        "main branch not ahead of remote",
+    );
+}
+
+#[then("the git status contains new commits on the remote")]
+fn the_git_status_contains_new_commits_on_the_remote(world: &mut IncrementalWorld) {
+    let store = match world {
+        IncrementalWorld::Successful { store, .. } => store,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let status = store
+        .git().expect("store is not using git")
+        .status().expect("failed to get git status");
+    assert!(status.conflicts.is_empty(), "conflicts is not empty");
+    assert!(status.workdir.is_empty(), "workdir is not empty");
+    assert!(status.staging.is_empty(), "staging is not empty");
+    assert_eq!(
+        status.branches,
+        vec![
+            BranchStatus {
+                branch: "main".to_owned(),
+                commits_behind_remote: 1,
+                commits_ahead_of_remote: 0,
+            },
+        ],
+        "main branch not ahead of remote",
+    );
+}
+
+#[then("the git status contains uncommitted changes")]
+fn the_git_status_contains_uncommitted_changes(world: &mut IncrementalWorld) {
+    let store = match world {
+        IncrementalWorld::Successful { store, .. } => store,
+        _ => panic!("World state is invalid!"),
+    };
+
+    let status = store
+        .git().expect("store is not using git")
+        .status().expect("failed to get git status");
+    assert!(status.conflicts.is_empty(), "conflicts is not empty");
+    assert_eq!(status.workdir.len(), 1, "workdir has not exactly one change");
+    assert!(status.staging.is_empty(), "staging is not empty");
+    assert!(status.branches.is_empty(), "branches is not empty");
 }

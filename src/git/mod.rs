@@ -14,12 +14,13 @@ use std::{fmt, path::PathBuf};
 use std::path::Path;
 
 pub use conflict_resolver::ConflictResolver;
+use crate::try_or;
 
 use custom_debug::Debug;
-use git2::{AnnotatedCommit, AutotagOption, Config, ConfigLevel, ErrorClass, ErrorCode, FetchOptions, IndexAddOption, ObjectType, Reference, Repository, StatusOptions, build::CheckoutBuilder};
+use git2::{AnnotatedCommit, AutotagOption, BranchType, Config, ErrorClass, ErrorCode, FetchOptions, IndexAddOption, ObjectType, Reference, Repository, StatusOptions, build::CheckoutBuilder};
 use walkdir::WalkDir;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GitStatusEntry {
     path: PathBuf,
     status: GitStatus,
@@ -35,7 +36,7 @@ impl GitStatusEntry {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GitStatus {
     New,
     Modified,
@@ -44,15 +45,23 @@ pub enum GitStatus {
     Typechange,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct BranchStatus {
+    pub branch: String,
+    pub commits_behind_remote: usize,
+    pub commits_ahead_of_remote: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct GitStatuses {
     pub staging: Vec<GitStatusEntry>,
     pub workdir: Vec<GitStatusEntry>,
     pub conflicts: Vec<PathBuf>,
+    pub branches: Vec<BranchStatus>,
 }
 
 impl GitStatuses {
-    fn new_from(statuses: git2::Statuses) -> Self {
+    fn new_from(branches: Vec<BranchStatus>, statuses: git2::Statuses) -> Self {
         let mut staging = Vec::new();
         let mut workdir = Vec::new();
         let mut conflicts = Vec::new();
@@ -93,6 +102,7 @@ impl GitStatuses {
             staging,
             workdir,
             conflicts,
+            branches,
         }
     }
 
@@ -320,7 +330,32 @@ impl Git {
         opts.exclude_submodules(true);
         let statuses = self.repo.statuses(Some(&mut opts))?;
 
-        Ok(GitStatuses::new_from(statuses))
+        let mut branches = Vec::new();
+        let local_branches = self.repo.branches(Some(BranchType::Local))?;
+        for branch in local_branches {
+            let (branch, _) = branch?;
+            let upstream = branch.upstream()?;
+            let local_commit = branch.get().peel_to_commit()?;
+            let remote_commit = upstream.get().peel_to_commit()?;
+            let mut revwalk = self.repo.revwalk()?;
+            revwalk.push(remote_commit.id())?;
+            revwalk.hide(local_commit.id())?;
+            let commits_behind_remote = revwalk.count();
+            let mut revwalk = self.repo.revwalk()?;
+            revwalk.push(local_commit.id())?;
+            revwalk.hide(remote_commit.id())?;
+            let commits_ahead_of_remote = revwalk.count();
+
+            if commits_behind_remote > 0 || commits_ahead_of_remote > 0 {
+                branches.push(BranchStatus {
+                    branch: branch.name()?.expect("Branch name not valid UTF-8").to_owned(),
+                    commits_behind_remote,
+                    commits_ahead_of_remote,
+                });
+            }
+        }
+
+        Ok(GitStatuses::new_from(branches, statuses))
     }
 
     pub fn commit<M: Into<String>>(&mut self, message: M) -> GitResult<()> {
@@ -384,66 +419,25 @@ impl Git {
     }
 
     pub fn config_valid(&self) -> bool {
-        let config = match Config::open_default() {
-            Ok(config) => config,
-            Err(_) => return false,
-        };
-        let mut entries = &match config.entries(None) {
-            Ok(entries) => entries,
-            Err(_) => return false,
-        };
+        let config = try_or!(self.repo.config(), false);
 
-        let has_email = entries.any(|e| {
-            let e = match e.ok() {
-                Some(e) => e,
-                None => return false,
-            };
-            let name = match e.name() {
-                Some(name) => name,
-                None => return false,
-            };
-
+        let entries = try_or!(config.entries(None), false);
+        let has_email = (&entries).any(|e| {
+            let e = try_or!(e, false);
+            let name = try_or!(e.name(), false);
             name == "user.email"
         });
-        let has_name = entries.any(|e| {
-            let e = match e.ok() {
-                Some(e) => e,
-                None => return false,
-            };
-            let name = match e.name() {
-                Some(name) => name,
-                None => return false,
-            };
-
+        let entries = try_or!(config.entries(None), false);
+        let has_name = (&entries).any(|e| {
+            let e = try_or!(e, false);
+            let name = try_or!(e.name(), false);
             name == "user.name"
         });
 
         has_email && has_name
     }
 
-    pub fn config_set_user_name(&mut self, name: &str) -> GitResult<()> {
-        // only store config for this repository
-        let mut config = Config::new()?.open_level(ConfigLevel::Local)?;
-        config.set_str("user.name", name)?;
-        Ok(())
-    }
-
-    pub fn config_user_name(&mut self) -> GitResult<String> {
-        let config = Config::open_default()?;
-        let name = config.get_string("user.name")?;
-        Ok(name)
-    }
-
-    pub fn config_set_user_email(&mut self, email: &str) -> GitResult<()> {
-        // only store config for this repository
-        let mut config = Config::new()?.open_level(ConfigLevel::Local)?;
-        config.set_str("user.email", email)?;
-        Ok(())
-    }
-
-    pub fn config_user_email(&mut self) -> GitResult<String> {
-        let config = Config::open_default()?;
-        let email = config.get_string("user.email")?;
-        Ok(email)
+    pub fn config(&mut self) -> GitResult<Config> {
+        self.repo.config()
     }
 }
