@@ -26,12 +26,10 @@ passwords = { version = "3.1.9", optional = true }
 custom_debug = "0.5.0"
 tempfile = "3.3.0"
 walkdir = "2.3.2"
-dissimilar = "1.0.3"
 similar = "2.1.0"
 
 [dev-dependencies]
 anyhow = "1.0.56"
-async-trait = "0.1.53"
 futures = "0.3.21"
 tar = "0.4.38"
 base64 = "0.13.0"
