@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::env;
 use std::panic::AssertUnwindSafe;
-use std::{convert::Infallible, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Context as AnyhowContext;
-use async_trait::async_trait;
-use cucumber::{World, WorldInit};
+use cucumber::World;
 use pass::{ConflictResolver, DecryptedPassword, Directory, Password, Store, StoreBuilder, StoreError};
 use tempfile::TempDir;
 
@@ -20,7 +19,7 @@ pub struct ResolvingStore {
     pub resolver: Option<ConflictResolver<'this>>,
 }
 
-#[derive(Debug, WorldInit)]
+#[derive(Debug, World)]
 pub enum IncrementalWorld {
     // You can use this struct for mutable context in scenarios.
     Initial,
@@ -133,12 +132,9 @@ pub enum IncrementalWorld {
     },
 }
 
-#[async_trait(?Send)]
-impl World for IncrementalWorld {
-    type Error = Infallible;
-
-    async fn new() -> Result<Self, Infallible> {
-        Ok(Self::Initial)
+impl Default for IncrementalWorld {
+    fn default() -> Self {
+        Self::Initial
     }
 }
 

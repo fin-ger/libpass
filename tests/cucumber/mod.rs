@@ -4,7 +4,7 @@ mod preparation;
 mod world;
 
 use anyhow::Context as AnyhowContext;
-use cucumber::{FailureWriter, WorldInit};
+use cucumber::{World, StatsWriter};
 use gpgme::{Context, CreateKeyFlags, PassphraseRequest, PinentryMode, Protocol};
 use std::{env, fs, io::Write, path::Path, process::Command, time::Duration};
 use world::IncrementalWorld;

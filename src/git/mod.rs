@@ -421,18 +421,29 @@ impl Git {
     pub fn config_valid(&self) -> bool {
         let config = try_or!(self.repo.config(), false);
 
-        let entries = try_or!(config.entries(None), false);
-        let has_email = (&entries).any(|e| {
-            let e = try_or!(e, false);
-            let name = try_or!(e.name(), false);
-            name == "user.email"
-        });
-        let entries = try_or!(config.entries(None), false);
-        let has_name = (&entries).any(|e| {
-            let e = try_or!(e, false);
-            let name = try_or!(e.name(), false);
-            name == "user.name"
-        });
+        let mut entries = try_or!(config.entries(None), false);
+        let mut has_email = false;
+        while let Some(item) = entries.next() {
+            let entry = try_or!(item, false);
+            let name = try_or!(entry.name(), false);
+
+            if name == "user.email" {
+                has_email = true;
+                break;
+            }
+        }
+
+        let mut entries = try_or!(config.entries(None), false);
+        let mut has_name = false;
+        while let Some(item) = entries.next() {
+            let entry = try_or!(item, false);
+            let name = try_or!(entry.name(), false);
+
+            if name == "user.name" {
+                has_name = true;
+                break;
+            }
+        }
 
         has_email && has_name
     }
