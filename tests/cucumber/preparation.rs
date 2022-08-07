@@ -2,8 +2,10 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::fs::{File, OpenOptions};
+use std::path::{PathBuf, Component};
 
 use cucumber::{given, when};
+use pass::TraversalOrder;
 
 use crate::world::IncrementalWorld;
 
@@ -739,4 +741,88 @@ fn this_file_is_committed_with_this_library(world: &mut IncrementalWorld) {
     let git = store.git().expect("store does not use git");
     git.add(&[&path]).expect("could not add file to git");
     git.commit("Let the Romulan intruder in").expect("failed to commit to git");
+}
+
+#[when("the password store is traversed in level-order")]
+fn the_password_store_is_traversed_in_level_order(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { store, home, envs } = prev {
+        let entries = store.show(".", TraversalOrder::LevelOrder).expect("Path not found");
+        let traversed_entries = entries
+            .map(|e| {
+                e.path()
+                    .components()
+                    .skip_while(|c| *c != Component::Normal(".password-store".as_ref()))
+                    .skip(1)
+                    .collect::<PathBuf>()
+            })
+            .collect::<Vec<PathBuf>>();
+
+        *world = IncrementalWorld::LevelOrderTraversal {
+            home,
+            envs,
+            store,
+            entries: traversed_entries,
+        };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("the password store is traversed in pre-order")]
+fn the_password_store_is_traversed_in_pre_order(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { store, home, envs } = prev {
+        let entries = store.show(".", TraversalOrder::PreOrder).expect("Path not found");
+        let traversed_entries = entries
+            .map(|e| {
+                e.path()
+                    .components()
+                    .skip_while(|c| *c != Component::Normal(".password-store".as_ref()))
+                    .skip(1)
+                    .collect::<PathBuf>()
+            })
+            .collect::<Vec<PathBuf>>();
+
+        *world = IncrementalWorld::PreOrderTraversal {
+            home,
+            envs,
+            store,
+            entries: traversed_entries,
+        };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[when("the password store is traversed in post-order")]
+fn the_password_store_is_traversed_in_post_order(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+
+    if let IncrementalWorld::Successful { store, home, envs } = prev {
+        let entries = store.show(".", TraversalOrder::PostOrder).expect("Path not found");
+        let traversed_entries = entries
+            .map(|e| {
+                e.path()
+                    .components()
+                    .skip_while(|c| *c != Component::Normal(".password-store".as_ref()))
+                    .skip(1)
+                    .collect::<PathBuf>()
+            })
+            .collect::<Vec<PathBuf>>();
+
+        *world = IncrementalWorld::PostOrderTraversal {
+            home,
+            envs,
+            store,
+            entries: traversed_entries,
+        };
+    } else {
+        panic!("World state is not Successful!");
+    }
 }

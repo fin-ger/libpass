@@ -130,6 +130,24 @@ pub enum IncrementalWorld {
         store: AssertUnwindSafe<Store>,
         envs: HashMap<String, String>,
     },
+    LevelOrderTraversal {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        envs: HashMap<String, String>,
+        entries: Vec<PathBuf>,
+    },
+    PreOrderTraversal {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        envs: HashMap<String, String>,
+        entries: Vec<PathBuf>,
+    },
+    PostOrderTraversal {
+        home: TempDir,
+        store: AssertUnwindSafe<Store>,
+        envs: HashMap<String, String>,
+        entries: Vec<PathBuf>,
+    },
 }
 
 impl Default for IncrementalWorld {

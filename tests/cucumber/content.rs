@@ -1,5 +1,6 @@
 use std::panic::AssertUnwindSafe;
 use std::process::{Command, Stdio};
+use std::path::PathBuf;
 
 use cucumber::{then, when};
 use pass::{GitRemote, Store, GpgKeyId, BranchStatus};
@@ -737,10 +738,10 @@ fn the_remotes_commits_are_merged(world: &mut IncrementalWorld) {
                                 |\\  \n\
                                 | * [Remote User] Reencrypt password store using new GPG id test@key.email, test2@key.email.\n\
                                 | * [Remote User] Set GPG id to test@key.email, test2@key.email.\n\
+                                * | [Test User] Reencrypt 'Phone' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Manufacturers/Yoyodyne' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Manufacturers/StrutCo' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Manufacturers/Sokor' as gpg-ids changed to test@key.email, test3@key.email.\n\
-                                * | [Test User] Reencrypt 'Phone' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Entertainment/Holo Deck/Broht & Forrester' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Main GPG IDs for store set to test@key.email, test3@key.email.\n\
                                 |/  \n\
@@ -1443,4 +1444,79 @@ fn the_git_status_contains_uncommitted_changes(world: &mut IncrementalWorld) {
     assert_eq!(status.workdir.len(), 1, "workdir has not exactly one change");
     assert!(status.staging.is_empty(), "staging is not empty");
     assert!(status.branches.is_empty(), "branches is not empty");
+}
+
+#[then("the passwords and directories are iterated in level-order form")]
+fn the_passwords_and_directories_are_iterated_in_level_order_form(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+    let entries = match prev {
+        IncrementalWorld::LevelOrderTraversal { entries, .. } => entries,
+        _ => panic!("World state is invalid!"),
+    };
+
+    assert_eq!(
+        entries,
+        vec![
+            PathBuf::from(""),
+            PathBuf::from("Entertainment"),
+            PathBuf::from("Manufacturers"),
+            PathBuf::from("Phone.gpg"),
+            PathBuf::from("Entertainment/Holo Deck"),
+            PathBuf::from("Manufacturers/Sokor.gpg"),
+            PathBuf::from("Manufacturers/StrutCo.gpg"),
+            PathBuf::from("Manufacturers/Yoyodyne.gpg"),
+            PathBuf::from("Entertainment/Holo Deck/Broht & Forrester.gpg"),
+        ],
+    );
+}
+
+#[then("the passwords and directories are iterated in pre-order form")]
+fn the_passwords_and_directories_are_iterated_in_pre_order_form(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+    let entries = match prev {
+        IncrementalWorld::PreOrderTraversal { entries, .. } => entries,
+        _ => panic!("World state is invalid!"),
+    };
+
+    assert_eq!(
+        entries,
+        vec![
+            PathBuf::from(""),
+            PathBuf::from("Entertainment"),
+            PathBuf::from("Entertainment/Holo Deck"),
+            PathBuf::from("Entertainment/Holo Deck/Broht & Forrester.gpg"),
+            PathBuf::from("Manufacturers"),
+            PathBuf::from("Manufacturers/Sokor.gpg"),
+            PathBuf::from("Manufacturers/StrutCo.gpg"),
+            PathBuf::from("Manufacturers/Yoyodyne.gpg"),
+            PathBuf::from("Phone.gpg"),
+        ],
+    );
+}
+
+#[then("the passwords and directories are iterated in post-order form")]
+fn the_passwords_and_directories_are_iterated_in_post_order_form(world: &mut IncrementalWorld) {
+    // This is needed to move out of AssertUnwindSafe
+    let prev = std::mem::replace(world, IncrementalWorld::Initial);
+    let entries = match prev {
+        IncrementalWorld::PostOrderTraversal { entries, .. } => entries,
+        _ => panic!("World state is invalid!"),
+    };
+
+    assert_eq!(
+        entries,
+        vec![
+            PathBuf::from("Entertainment/Holo Deck/Broht & Forrester.gpg"),
+            PathBuf::from("Entertainment/Holo Deck"),
+            PathBuf::from("Entertainment"),
+            PathBuf::from("Manufacturers/Sokor.gpg"),
+            PathBuf::from("Manufacturers/StrutCo.gpg"),
+            PathBuf::from("Manufacturers/Yoyodyne.gpg"),
+            PathBuf::from("Manufacturers"),
+            PathBuf::from("Phone.gpg"),
+            PathBuf::from(""),
+        ],
+    );
 }
