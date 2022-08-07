@@ -7,9 +7,9 @@ use crate::{PassNode, EntryKind};
 
 bitflags! {
     pub struct Sorting: u8 {
-        const NONE = 0;
-        const ALPHABETICAL = 1;
-        const DIRECTORIES_FIRST = 2;
+        const NONE = 0b00000001;
+        const ALPHABETICAL = 0b00000010;
+        const DIRECTORIES_FIRST = 0b00000100;
     }
 }
 
@@ -28,29 +28,7 @@ impl Sorting {
 
             a_low.cmp(&b_low)
         } else {
-            Ordering::Less
+            Ordering::Equal
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::Sorting;
-
-    #[test]
-    fn sorting() {
-        assert!(Sorting::NONE.bits() == 0, "Sorting::NONE is not 0");
-        assert!(
-            Sorting::ALPHABETICAL.bits() == 1,
-            "Sorting::ALPHABETICAL is not 1"
-        );
-        assert!(
-            Sorting::DIRECTORIES_FIRST.bits() == 2,
-            "Sorting::DIRECTORIES_FIRST is not 2"
-        );
-        assert!(
-            (Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST).bits() == 3,
-            "Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST is not 3"
-        );
     }
 }

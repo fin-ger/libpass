@@ -738,10 +738,10 @@ fn the_remotes_commits_are_merged(world: &mut IncrementalWorld) {
                                 |\\  \n\
                                 | * [Remote User] Reencrypt password store using new GPG id test@key.email, test2@key.email.\n\
                                 | * [Remote User] Set GPG id to test@key.email, test2@key.email.\n\
-                                * | [Test User] Reencrypt 'Phone' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Manufacturers/Yoyodyne' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Manufacturers/StrutCo' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Manufacturers/Sokor' as gpg-ids changed to test@key.email, test3@key.email.\n\
+                                * | [Test User] Reencrypt 'Phone' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Reencrypt 'Entertainment/Holo Deck/Broht & Forrester' as gpg-ids changed to test@key.email, test3@key.email.\n\
                                 * | [Test User] Main GPG IDs for store set to test@key.email, test3@key.email.\n\
                                 |/  \n\

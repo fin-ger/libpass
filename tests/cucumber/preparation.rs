@@ -5,7 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::path::{PathBuf, Component};
 
 use cucumber::{given, when};
-use pass::TraversalOrder;
+use pass::{TraversalOrder, Sorting};
 
 use crate::world::IncrementalWorld;
 
@@ -748,7 +748,8 @@ fn the_password_store_is_traversed_in_level_order(world: &mut IncrementalWorld) 
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Successful { store, home, envs } = prev {
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        store.sort(Sorting::DIRECTORIES_FIRST | Sorting::ALPHABETICAL);
         let entries = store.show(".", TraversalOrder::LevelOrder).expect("Path not found");
         let traversed_entries = entries
             .map(|e| {
@@ -776,7 +777,8 @@ fn the_password_store_is_traversed_in_pre_order(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Successful { store, home, envs } = prev {
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        store.sort(Sorting::DIRECTORIES_FIRST | Sorting::ALPHABETICAL);
         let entries = store.show(".", TraversalOrder::PreOrder).expect("Path not found");
         let traversed_entries = entries
             .map(|e| {
@@ -804,7 +806,8 @@ fn the_password_store_is_traversed_in_post_order(world: &mut IncrementalWorld) {
     // This is needed to move out of AssertUnwindSafe
     let prev = std::mem::replace(world, IncrementalWorld::Initial);
 
-    if let IncrementalWorld::Successful { store, home, envs } = prev {
+    if let IncrementalWorld::Successful { mut store, home, envs } = prev {
+        store.sort(Sorting::ALPHABETICAL | Sorting::DIRECTORIES_FIRST);
         let entries = store.show(".", TraversalOrder::PostOrder).expect("Path not found");
         let traversed_entries = entries
             .map(|e| {

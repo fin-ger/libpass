@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::{env, fs, path::Path};
 
@@ -116,7 +115,7 @@ impl Store {
     }
 
     fn load_passwords_from_dir(&mut self, dir: &Path, parent: &NodeId) {
-        let (mut read_dir, errors) = match fs::read_dir(dir).with_store_error(dir.display().to_string())
+        let (read_dir, errors) = match fs::read_dir(dir).with_store_error(dir.display().to_string())
         {
             Ok(read_dir) => {
                 let (mut read_dir_res, mut errors_res): (Vec<_>, Vec<_>) =
@@ -131,28 +130,6 @@ impl Store {
             }
             Err(err) => (vec![], vec![err]),
         };
-
-        read_dir.sort_by(|a, b| {
-            a.path().cmp(&b.path())
-        });
-        read_dir.sort_by(|a, b| {
-            let mut a_is_file = true;
-            let mut b_is_file = true;
-            if let Ok(file_type) = a.file_type() {
-                a_is_file = file_type.is_file();
-            }
-            if let Ok(file_type) = b.file_type() {
-                b_is_file = file_type.is_file();
-            }
-
-            if a_is_file && !b_is_file {
-                Ordering::Greater
-            } else if !a_is_file && b_is_file {
-                Ordering::Less
-            } else {
-                Ordering::Equal
-            }
-        });
 
         for entry in read_dir {
             let path = entry.path();
