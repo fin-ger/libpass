@@ -1,6 +1,8 @@
 [test_config]
-debug = true
 verbose = false
+implicit-test-threads = true
+no-fail-fast = true
+follow-exec = true
 
 [report]
 out = ["Html"]

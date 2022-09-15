@@ -6,7 +6,7 @@ edition = "2018"
 include = ["src/**/*", "LICENSE", "README.md"]
 
 [features]
-default = ["passphrase-utils"]
+default = ["passphrase-utils", "parsed-passwords"]
 
 parsed-passwords = ["pest", "pest_derive"]
 passphrase-utils = ["passwords"]

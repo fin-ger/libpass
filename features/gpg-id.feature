@@ -5,6 +5,7 @@ Feature: Using GPG IDs
     When the password store is successfully opened
     And a different GPG ID is set for a subdirectory of the password store
     Then a .gpg-id file is created in that subdirectory
+    And all passwords within this directory are re-encrypted
 
   Scenario: Using the next-in-parent-directories GPG ID to decrypt a password
     Given a password store exists

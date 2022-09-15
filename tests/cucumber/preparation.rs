@@ -125,7 +125,7 @@ fn passwords_are_stored_in_the_password_store(world: &mut IncrementalWorld) {
         insert_password(
             envs,
             "Manufacturers/Yoyodyne",
-            "all1the%fancy@panels+are;for<me\n\nuser: laforge\n",
+            "all1the%fancy@panels+are;for<me\nParts are best from Utopia Planitia\nuser: laforge\n",
         );
         insert_password(
             envs,

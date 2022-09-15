@@ -47,6 +47,10 @@ pub enum IncrementalWorld {
     DecryptedPassword {
         password: DecryptedPassword,
     },
+    #[cfg(feature = "parsed-passwords")]
+    DecryptedParsedPassword {
+        password: pass::parsed::DecryptedPassword,
+    },
     Search {
         found_entries: Vec<PathBuf>,
     },

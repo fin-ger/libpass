@@ -761,18 +761,42 @@ fn the_remotes_commits_are_merged(world: &mut IncrementalWorld) {
 fn a_password_is_opened(world: &mut IncrementalWorld) {
     if let IncrementalWorld::Successful { store, .. } = world {
         let entry = store
-            .show("./Manufacturers/StrutCo.gpg", TraversalOrder::PreOrder)
+            .show("./Manufacturers/Yoyodyne.gpg", TraversalOrder::PreOrder)
             .unwrap()
             .next()
-            .expect("Manufacturers/StrutCo password not found in password store!");
+            .expect("Manufacturers/Yoyodyne password not found in password store!");
 
         let strutco = entry
             .password()
-            .expect("Manufacturers/StrutCo is not a password but a directory!");
+            .expect("Manufacturers/Yoyodyne is not a password but a directory!");
         let password = strutco
             .decrypt()
-            .expect("Decrypting Manufacturers/StrutCo failed!");
+            .expect("Decrypting Manufacturers/Yoyodyne failed!");
         *world = IncrementalWorld::DecryptedPassword { password };
+    } else {
+        panic!("World state is not Successful!");
+    }
+}
+
+#[cfg(feature = "parsed-passwords")]
+#[when("a parsed password is opened")]
+fn a_parsed_password_is_opened(world: &mut IncrementalWorld) {
+    if let IncrementalWorld::Successful { store, .. } = world {
+        let entry = store
+            .show("./Manufacturers/Yoyodyne.gpg", TraversalOrder::PreOrder)
+            .unwrap()
+            .next()
+            .expect("Manufacturers/Yoyodyne password not found in password store!");
+
+        let strutco = entry
+            .password()
+            .expect("Manufacturers/Yoyodyne is not a password but a directory!");
+        let password = strutco
+            .decrypt()
+            .expect("Decrypting Manufacturers/Yoyodyne failed!")
+            .parsed()
+            .expect("Parsing Manufacturers/Yoyodyne failed");
+        *world = IncrementalWorld::DecryptedParsedPassword { password };
     } else {
         panic!("World state is not Successful!");
     }
@@ -1443,4 +1467,50 @@ fn the_git_status_contains_uncommitted_changes(world: &mut IncrementalWorld) {
     assert_eq!(status.workdir.len(), 1, "workdir has not exactly one change");
     assert!(status.staging.is_empty(), "staging is not empty");
     assert!(status.branches.is_empty(), "branches is not empty");
+}
+
+#[then("the passphrase can be read")]
+fn the_passphrase_can_be_read(world: &mut IncrementalWorld) {
+    match world {
+        IncrementalWorld::DecryptedPassword { password, .. } => {
+            assert_eq!(password.passphrase(), Some("all1the%fancy@panels+are;for<me"));
+        },
+        #[cfg(feature = "parsed-passwords")]
+        IncrementalWorld::DecryptedParsedPassword { password, .. } => {
+            assert_eq!(password.passphrase(), Some("all1the%fancy@panels+are;for<me"));
+        },
+        _ => panic!("World state is invalid!"),
+    };
+}
+
+#[then("an additional line can be read")]
+fn an_additional_line_can_be_read(world: &mut IncrementalWorld) {
+    let password = match world {
+        IncrementalWorld::DecryptedPassword { password, .. } => password,
+        _ => panic!("World state is invalid!"),
+    };
+
+    assert_eq!(password.lines().next(), Some("Parts are best from Utopia Planitia"));
+}
+
+#[cfg(feature = "parsed-passwords")]
+#[then("an entry can be read")]
+fn an_entry_can_be_read(world: &mut IncrementalWorld) {
+    let password = match world {
+        IncrementalWorld::DecryptedParsedPassword { password, .. } => password,
+        _ => panic!("World state is invalid!"),
+    };
+
+    assert_eq!(password.entry("user"), Some("laforge"));
+}
+
+#[cfg(feature = "parsed-passwords")]
+#[then("a comment can be read")]
+fn a_comment_can_be_read(world: &mut IncrementalWorld) {
+    let password = match world {
+        IncrementalWorld::DecryptedParsedPassword { password, .. } => password,
+        _ => panic!("World state is invalid!"),
+    };
+
+    assert_eq!(password.comments().next(), Some("Parts are best from Utopia Planitia"));
 }

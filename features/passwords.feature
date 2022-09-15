@@ -7,21 +7,37 @@ Feature: Working with passwords
     And a password is opened
     Then the passphrase can be read
 
-  Scenario: Opening a password and reading a comment
+  Scenario: Opening a password and reading an additional line
     Given a password store exists
     And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
     And a password is opened
-    Then a comment can be read
+    Then an additional line can be read
 
-  Scenario: Opening a password and reading an entry
+  Scenario: Opening a parsed password and reading the password
     Given a password store exists
     And passwords are stored in the password store
     And a password store is opened
     When the password store is successfully opened
-    And a password is opened
+    And a parsed password is opened
+    Then the passphrase can be read
+
+  Scenario: Opening a parsed password and reading an entry
+    Given a password store exists
+    And passwords are stored in the password store
+    And a password store is opened
+    When the password store is successfully opened
+    And a parsed password is opened
     Then an entry can be read
+
+  Scenario: Opening a parsed password and reading a comment
+    Given a password store exists
+    And passwords are stored in the password store
+    And a password store is opened
+    When the password store is successfully opened
+    And a parsed password is opened
+    Then a comment can be read
 
   Scenario: Opening a password and creating a QR code for passphrase
     Given a password store exists
